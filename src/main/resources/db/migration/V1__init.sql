@@ -25,3 +25,11 @@ ALTER TABLE plans
 
 ALTER TABLE plans
   ADD CONSTRAINT fk_plans_on_limit FOREIGN KEY (limit_id) REFERENCES limits (id);
+
+INSERT INTO limits
+VALUES ('2a819753-5013-4723-b1b0-7adfcb84d476', 1, now(), now()),
+       ('2a819753-5013-4723-b1b0-7adfcb84d477', 10, now(), now());
+
+INSERT INTO plans
+VALUES ('2a819753-5013-4723-b1b0-7adfcb84d466', 'free', 'Бесплатный', 0, 0, now(), now(), '2a819753-5013-4723-b1b0-7adfcb84d476'),
+       ('2a819753-5013-4723-b1b0-7adfcb84d467', 'month', 'Подписка на месяц', 990, 30, now(), now(), '2a819753-5013-4723-b1b0-7adfcb84d477');
