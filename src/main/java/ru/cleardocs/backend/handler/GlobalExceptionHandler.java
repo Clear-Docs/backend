@@ -16,13 +16,13 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(NotFoundException.class)
   public ResponseEntity<ErrorDto> handleNotFoundException(NotFoundException exception) {
-    log.info("handleNotFoundException() - exception with message = {}", exception.getMessage());
+    log.error("handleNotFoundException() - exception with message = {}", exception.getMessage());
     return new ResponseEntity<>(new ErrorDto(exception.getMessage(), HttpStatus.NOT_FOUND.value(), LocalDateTime.now()), HttpStatus.NOT_FOUND);
   }
 
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ErrorDto> handleException(Exception exception) {
-    log.info("handleException() - exception with message = {}", exception.getMessage());
+    log.error("handleException() - exception: ", exception);
     return new ResponseEntity<>(new ErrorDto(exception.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR.value(), LocalDateTime.now()), HttpStatus.INTERNAL_SERVER_ERROR);
   }
 }
