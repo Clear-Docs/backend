@@ -3,7 +3,7 @@ CREATE TABLE users
   id           UUID                        NOT NULL,
   firebase_uid VARCHAR(255) UNIQUE         NOT NULL,
   email        VARCHAR(255)                NOT NULL,
-  name         VARCHAR(255)                NOT NULL,
+  name         VARCHAR(255),
   created_at   TIMESTAMP WITHOUT TIME ZONE NOT NULL,
   updated_at   TIMESTAMP WITHOUT TIME ZONE NOT NULL,
   plan_id      UUID                        NOT NULL,
