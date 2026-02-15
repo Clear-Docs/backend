@@ -2,14 +2,13 @@ package ru.cleardocs.backend.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
-import ru.cleardocs.backend.constant.PlanCode;
-import ru.cleardocs.backend.entity.Plan;
+import ru.cleardocs.backend.entity.User;
 
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface PlanRepository extends JpaRepository<Plan, UUID> {
+public interface UserRepository extends JpaRepository<User, UUID> {
 
-  Optional<Plan> findByCode(PlanCode code);
+  Optional<User> findByFirebaseUid(String firebaseUid);
 }

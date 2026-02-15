@@ -2,6 +2,7 @@ package ru.cleardocs.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import ru.cleardocs.backend.constant.PlanCode;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -19,7 +20,9 @@ public class Plan {
   @GeneratedValue
   private UUID id;
 
-  private String code;
+  @Enumerated(EnumType.STRING)
+  private PlanCode code;
+
   private String title;
   private int priceRub;
   private int periodDays;
