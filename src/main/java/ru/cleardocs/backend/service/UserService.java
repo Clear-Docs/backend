@@ -5,8 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.cleardocs.backend.constant.PlanCode;
+import ru.cleardocs.backend.dto.GetMeDto;
 import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
+import ru.cleardocs.backend.mapper.UserMapper;
 import ru.cleardocs.backend.repository.UserRepository;
 
 import java.util.Optional;
@@ -15,12 +17,21 @@ import java.util.Optional;
 @Service
 public class UserService {
 
+  private final UserMapper userMapper;
   private final PlanService planService;
   private final UserRepository userRepository;
 
-  public UserService(PlanService planService, UserRepository userRepository) {
+  public UserService(UserMapper userMapper, PlanService planService, UserRepository userRepository) {
+    this.userMapper = userMapper;
     this.planService = planService;
     this.userRepository = userRepository;
+  }
+
+  public GetMeDto getMe(User user) {
+    log.info("getMe() - starts with user id = {}", user.getId());
+    GetMeDto response = new GetMeDto(userMapper.toDto(user));
+    log.info("getMe() - ends");
+    return response;
   }
 
   @Transactional
