@@ -23,13 +23,13 @@ public class UserService {
   }
 
   @Transactional
-  public User getUser(String token) {
+  public User getByToken(String token) {
     log.info("getUser() - starts");
     Optional<User> userOptional = userRepository.findByFirebaseUid(token);
     User user;
     if (userOptional.isEmpty()) {
       log.info("getUser() - user is not found");
-      user = registerUser(token);
+      user = register(token);
     } else {
       user = userOptional.get();
     }
@@ -37,7 +37,7 @@ public class UserService {
     return user;
   }
 
-  private User registerUser(String token) {
+  private User register(String token) {
     log.info("registerUser() - starts");
     Plan plan = planService.getByCode(PlanCode.FREE);
     User newUser = userRepository.save(User.builder()
