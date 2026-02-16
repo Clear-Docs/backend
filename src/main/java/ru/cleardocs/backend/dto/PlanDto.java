@@ -1,4 +1,6 @@
 package ru.cleardocs.backend.dto;
 
-public record PlanDto(String code, String title, int priceRub, int periodDays, LimitDto limit) {
+import ru.cleardocs.backend.constant.PlanCode;
+
+public record PlanDto(PlanCode code, String title, int priceRub, int periodDays, LimitDto limit) {
 }

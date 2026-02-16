@@ -2,7 +2,6 @@ package ru.cleardocs.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import ru.cleardocs.backend.constant.PlanCode;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -13,25 +12,22 @@ import java.util.UUID;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "plans")
-public class Plan {
+@Table(name = "users")
+public class User {
 
   @Id
   @GeneratedValue
   private UUID id;
 
-  @Enumerated(EnumType.STRING)
-  private PlanCode code;
-
-  private String title;
-  private int priceRub;
-  private int periodDays;
+  private String firebaseUid;
+  private String email;
+  private String name;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
 
-  @OneToOne
-  @JoinColumn(name = "limit_id")
-  private Limit limit;
+  @ManyToOne
+  @JoinColumn(name = "plan_id")
+  private Plan plan;
 
   @PrePersist
   public void prePersist() {
