@@ -70,13 +70,9 @@ jobs:
             SERVICE_NAME="${{ secrets.SERVICE_NAME || 'cleardocs-backend' }}"
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH || '/opt/cleardocs-backend' }}"
 
-            if ! sudo systemctl list-unit-files --type=service | grep -q "^${SERVICE_NAME}.service"; then
-              echo "Service not found, installing unit file..."
-              sudo cp "${DEPLOY_PATH}/cleardocs-backend.service" /etc/systemd/system/${SERVICE_NAME}.service
-              sudo systemctl daemon-reload
-              sudo systemctl enable ${SERVICE_NAME}
-            fi
-
+            # Always update unit file so fixes (e.g. java path) propagate
+            sudo cp "${DEPLOY_PATH}/cleardocs-backend.service" /etc/systemd/system/${SERVICE_NAME}.service
             sudo systemctl daemon-reload
+            sudo systemctl enable ${SERVICE_NAME}
             sudo systemctl restart ${SERVICE_NAME}
             sudo systemctl status ${SERVICE_NAME} --no-pager
