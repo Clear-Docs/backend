@@ -57,6 +57,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           source: "target/*.jar"
           target: "${{ secrets.DEPLOY_PATH || '/opt/cleardocs-backend' }}"
+          strip_components: 1
 
       - name: Restart service
         uses: appleboy/ssh-action@v1.0.3
