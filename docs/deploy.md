@@ -31,6 +31,8 @@ cat ~/.ssh/id_rsa
 
 ## Настройка сервера
 
+**Docker должен быть установлен на сервере до первого деплоя.**
+
 1. Установи Docker и Docker Compose:
 
 ```bash
@@ -40,10 +42,11 @@ sudo usermod -aG docker $USER
 # Перелогинься или выполни: newgrp docker
 ```
 
-2. Разреши пользователю `SSH_USER` выполнять Docker без sudo (если нужен доступ без root):
+2. Добавь пользователя `SSH_USER` в группу docker (чтобы он мог запускать контейнеры без root):
 
 ```bash
-sudo usermod -aG docker $SSH_USER
+sudo usermod -aG docker SSH_USER
+# Замени SSH_USER на реальное имя (ubuntu, deploy и т.п.)
 ```
 
 3. Первый деплой создаст PostgreSQL в контейнере. Flyway выполнит миграции автоматически при старте backend.
