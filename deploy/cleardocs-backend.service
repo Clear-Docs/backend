@@ -1,0 +1,14 @@
+[Unit]
+Description=ClearDocs Backend
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/cleardocs-backend
+ExecStart=/usr/bin/java -jar /opt/cleardocs-backend/backend-0.0.1-SNAPSHOT.jar
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
