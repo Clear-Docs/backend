@@ -219,7 +219,7 @@ public class OnyxClient {
     HttpEntity<OnyxDocumentSetUpdateRequestDto> entity = new HttpEntity<>(request, headers);
     restTemplate.exchange(
         url,
-        HttpMethod.PATCH,
+        HttpMethod.POST,
         entity,
         Void.class
     );
