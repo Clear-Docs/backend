@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import ru.cleardocs.backend.dto.ErrorDto;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.exception.NotFoundException;
@@ -19,6 +20,14 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorDto> handleBadRequestException(BadRequestException exception) {
     log.warn("handleBadRequestException() - {}", exception.getMessage());
     return new ResponseEntity<>(new ErrorDto(exception.getMessage(), HttpStatus.BAD_REQUEST.value(), LocalDateTime.now()), HttpStatus.BAD_REQUEST);
+  }
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ErrorDto> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException exception) {
+    log.warn("handleMaxUploadSizeExceeded() - {}", exception.getMessage());
+    return new ResponseEntity<>(
+        new ErrorDto("File size exceeds maximum allowed. Please upload smaller files.", HttpStatus.PAYLOAD_TOO_LARGE.value(), LocalDateTime.now()),
+        HttpStatus.PAYLOAD_TOO_LARGE);
   }
 
   @ExceptionHandler(NotFoundException.class)
