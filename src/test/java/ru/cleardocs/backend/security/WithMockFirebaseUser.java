@@ -14,4 +14,9 @@ public @interface WithMockFirebaseUser {
   String name() default "Test User";
 
   String planCode() default "FREE";
+
+  /**
+   * docSetId for the mock user. Use 0 or negative to indicate null (no document set).
+   */
+  int docSetId() default 0;
 }

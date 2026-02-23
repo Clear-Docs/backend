@@ -5,20 +5,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
-import ru.cleardocs.backend.config.TestFirebaseConfig;
 import org.springframework.test.web.servlet.MockMvc;
-import ru.cleardocs.backend.dto.GetMeDto;
-import ru.cleardocs.backend.dto.LimitDto;
-import ru.cleardocs.backend.dto.PlanDto;
-import ru.cleardocs.backend.dto.UserDto;
-import org.springframework.security.core.context.SecurityContextHolder;
-import ru.cleardocs.backend.constant.PlanCode;
+import ru.cleardocs.backend.client.onyx.OnyxClient;
+import ru.cleardocs.backend.config.TestFirebaseConfig;
 import ru.cleardocs.backend.security.WithMockFirebaseUser;
-import ru.cleardocs.backend.service.UserService;
 
-import static org.mockito.ArgumentMatchers.any;
+import java.util.List;
+
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,32 +25,39 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Import(TestFirebaseConfig.class)
 @ActiveProfiles("test")
-class UserControllerTest {
+class ConnectorControllerTest {
 
   @Autowired
   MockMvc mockMvc;
 
   @MockitoBean
-  UserService userService;
+  OnyxClient onyxClient;
 
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE")
-  void getMe_authenticated_returnsUserInfo() throws Exception {
-    var userDto = new UserDto("test@example.com", "Test User",
-        new PlanDto(PlanCode.FREE, "Бесплатный", 0, 30, new LimitDto(1)), null);
-    when(userService.getMe(any())).thenReturn(new GetMeDto(userDto));
-
-    mockMvc.perform(get("/api/v1/users/me")
+  void getConnectors_authenticatedUserWithoutDocSet_returnsEmptyList() throws Exception {
+    mockMvc.perform(get("/api/v1/connectors")
             .with(securityContext(SecurityContextHolder.getContext())))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.user.email").value("test@example.com"))
-        .andExpect(jsonPath("$.user.name").value("Test User"))
-        .andExpect(jsonPath("$.user.plan.code").value("FREE"));
+        .andExpect(jsonPath("$.connectors").isArray())
+        .andExpect(jsonPath("$.connectors").isEmpty());
   }
 
   @Test
-  void getMe_unauthenticated_returns401() throws Exception {
-    mockMvc.perform(get("/api/v1/users/me"))
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void getConnectors_noConnectorsInDatabase_returnsEmptyList() throws Exception {
+    when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of());
+
+    mockMvc.perform(get("/api/v1/connectors")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.connectors").isArray())
+        .andExpect(jsonPath("$.connectors").isEmpty());
+  }
+
+  @Test
+  void getConnectors_unauthenticated_returns401() throws Exception {
+    mockMvc.perform(get("/api/v1/connectors"))
         .andExpect(status().isUnauthorized());
   }
 }

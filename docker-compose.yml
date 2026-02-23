@@ -26,6 +26,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       FIREBASE_CONFIG_PATH: /app/firebase-key.json
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      ONYX_API_KEY: ${ONYX_API_KEY}
     volumes:
       - ./firebase-key.json:/app/firebase-key.json:ro
     ports:

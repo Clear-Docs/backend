@@ -29,6 +29,9 @@ public class User {
   @JoinColumn(name = "plan_id")
   private Plan plan;
 
+  @Column(name = "doc_set_id")
+  private Integer docSetId;
+
   @PrePersist
   public void prePersist() {
     this.createdAt = LocalDateTime.now();

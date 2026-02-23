@@ -84,12 +84,13 @@ jobs:
           CORS_ALLOWED_ORIGINS: ${{ secrets.CORS_ALLOWED_ORIGINS }}
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+          ONYX_API_KEY: ${{ secrets.ONYX_API_KEY }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          envs: DEPLOY_PATH,DB_PASSWORD,FIREBASE_SERVICE_ACCOUNT_JSON,CORS_ALLOWED_ORIGINS,GHCR_TOKEN,GITHUB_ACTOR
+          envs: DEPLOY_PATH,DB_PASSWORD,FIREBASE_SERVICE_ACCOUNT_JSON,CORS_ALLOWED_ORIGINS,GHCR_TOKEN,GITHUB_ACTOR,ONYX_API_KEY
           script: |
             cd "$DEPLOY_PATH"
             chmod +x deploy/docker-deploy.sh

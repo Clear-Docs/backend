@@ -1,0 +1,2 @@
+ALTER TABLE users
+  ADD COLUMN doc_set_id INTEGER NULL;

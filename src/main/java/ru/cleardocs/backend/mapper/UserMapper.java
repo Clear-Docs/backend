@@ -14,6 +14,6 @@ public class UserMapper {
   }
 
   public UserDto toDto(User user) {
-    return new UserDto(user.getEmail(), user.getName(), planMapper.toDto(user.getPlan()));
+    return new UserDto(user.getEmail(), user.getName(), planMapper.toDto(user.getPlan()), user.getDocSetId());
   }
 }
