@@ -119,18 +119,18 @@ public class ConnectorService {
     List<Integer> allCcPairIds = new ArrayList<>(existingCcPairIds);
     allCcPairIds.add(ccPairId);
 
-    onyxClient.getDocumentSetById(user.getDocSetId())
-        .ifPresent(docSet -> {
-          OnyxDocumentSetUpdateRequestDto updateRequest = new OnyxDocumentSetUpdateRequestDto(
-              docSet.id(),
-              docSet.description() != null ? docSet.description() : "",
-              allCcPairIds,
-              docSet.isPublic(),
-              docSet.users(),
-              docSet.groups()
-          );
-          onyxClient.updateDocumentSet(updateRequest);
-          log.info("createFileConnector() - updated document set id = {} with new connector", docSet.id());
-        });
+    var docSet = onyxClient.getDocumentSetById(user.getDocSetId())
+        .orElseThrow(() -> new RuntimeException("Document set not found in Onyx for docSetId=" + user.getDocSetId()));
+
+    OnyxDocumentSetUpdateRequestDto updateRequest = new OnyxDocumentSetUpdateRequestDto(
+        docSet.id(),
+        docSet.description() != null ? docSet.description() : "",
+        allCcPairIds,
+        docSet.isPublic(),
+        docSet.users(),
+        docSet.groups()
+    );
+    onyxClient.updateDocumentSet(updateRequest);
+    log.info("createFileConnector() - updated document set id = {} with new connector", docSet.id());
   }
 }

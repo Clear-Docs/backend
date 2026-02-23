@@ -16,6 +16,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.cleardocs.backend.client.onyx.OnyxClient;
 import ru.cleardocs.backend.client.onyx.OnyxCreateConnectorResponseDto;
+import ru.cleardocs.backend.client.onyx.OnyxDocumentSetDto;
 import ru.cleardocs.backend.client.onyx.OnyxFileUploadResponseDto;
 import ru.cleardocs.backend.config.TestFirebaseConfig;
 import ru.cleardocs.backend.entity.User;
@@ -23,6 +24,7 @@ import ru.cleardocs.backend.repository.UserRepository;
 import ru.cleardocs.backend.security.WithMockFirebaseUser;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -82,6 +84,9 @@ class ConnectorControllerTest {
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void createFileConnector_authenticatedUser_returns201() throws Exception {
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of());
+    when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
+        new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
+    ));
 
     when(onyxClient.uploadFiles(any())).thenReturn(
         new OnyxFileUploadResponseDto(List.of("file-id-1"), List.of("doc.pdf"), null)
