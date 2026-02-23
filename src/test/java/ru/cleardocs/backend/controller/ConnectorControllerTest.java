@@ -1,6 +1,9 @@
 package ru.cleardocs.backend.controller;
 
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -13,15 +16,20 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.cleardocs.backend.client.onyx.OnyxClient;
 import ru.cleardocs.backend.client.onyx.OnyxCreateConnectorResponseDto;
+import ru.cleardocs.backend.client.onyx.OnyxDocumentSetDto;
 import ru.cleardocs.backend.client.onyx.OnyxFileUploadResponseDto;
 import ru.cleardocs.backend.config.TestFirebaseConfig;
+import ru.cleardocs.backend.entity.User;
+import ru.cleardocs.backend.repository.UserRepository;
 import ru.cleardocs.backend.security.WithMockFirebaseUser;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,6 +48,9 @@ class ConnectorControllerTest {
 
   @MockitoBean
   OnyxClient onyxClient;
+
+  @MockitoBean
+  UserRepository userRepository;
 
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE")
@@ -73,6 +84,9 @@ class ConnectorControllerTest {
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void createFileConnector_authenticatedUser_returns201() throws Exception {
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of());
+    when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
+        new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
+    ));
 
     when(onyxClient.uploadFiles(any())).thenReturn(
         new OnyxFileUploadResponseDto(List.of("file-id-1"), List.of("doc.pdf"), null)
@@ -101,5 +115,40 @@ class ConnectorControllerTest {
         .andExpect(jsonPath("$.id").value(123))
         .andExpect(jsonPath("$.name").value("My Connector"))
         .andExpect(jsonPath("$.type").value("file"));
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE")
+  void createFileConnector_userWithoutDocSet_createsDocumentSetAndSavesToDb() throws Exception {
+    when(onyxClient.uploadFiles(any())).thenReturn(
+        new OnyxFileUploadResponseDto(List.of("file-id-1"), List.of("doc.pdf"), null)
+    );
+    when(onyxClient.createFileConnector(eq("My Connector"), anyList(), anyList()))
+        .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 456));
+    when(onyxClient.createDocumentSet(eq("Documents"), eq(""), eq(List.of(456)))).thenReturn(123);
+
+    MockMultipartFile file = new MockMultipartFile(
+        "files",
+        "doc.pdf",
+        MediaType.APPLICATION_PDF_VALUE,
+        "test content".getBytes()
+    );
+
+    mockMvc.perform(
+            multipart("/api/v1/connectors")
+                .file(file)
+                .param("name", "My Connector")
+                .with(securityContext(SecurityContextHolder.getContext()))
+        )
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").value(456))
+        .andExpect(jsonPath("$.name").value("My Connector"))
+        .andExpect(jsonPath("$.type").value("file"));
+
+    var captor = org.mockito.ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    User savedUser = captor.getValue();
+    assertNotNull(savedUser.getDocSetId());
+    assertEquals(123, savedUser.getDocSetId());
   }
 }

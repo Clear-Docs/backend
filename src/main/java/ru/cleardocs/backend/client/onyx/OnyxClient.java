@@ -19,6 +19,7 @@ import ru.cleardocs.backend.dto.EntityConnectorDto;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -162,5 +163,75 @@ public class OnyxClient {
       throw new RuntimeException("Onyx create connector returned empty response");
     }
     return response.getBody();
+  }
+
+  /**
+   * Creates a document set in Onyx with the given name, description, and connector ids.
+   * Returns the new document set id.
+   */
+  public int createDocumentSet(String name, String description, List<Integer> ccPairIds) {
+    String url = baseUrl + "/manage/admin/document-set";
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    OnyxDocumentSetCreateRequestDto request = new OnyxDocumentSetCreateRequestDto(
+        name,
+        description != null ? description : "",
+        ccPairIds,
+        true,
+        Collections.emptyList(),
+        Collections.emptyList()
+    );
+    HttpEntity<OnyxDocumentSetCreateRequestDto> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<Integer> response = restTemplate.exchange(
+        url,
+        HttpMethod.POST,
+        entity,
+        Integer.class
+    );
+    if (response.getBody() == null) {
+      throw new RuntimeException("Onyx create document set returned empty response");
+    }
+    return response.getBody();
+  }
+
+  /**
+   * Updates a document set in Onyx with the new list of connector ids.
+   */
+  public void updateDocumentSet(OnyxDocumentSetUpdateRequestDto request) {
+    String url = baseUrl + "/manage/admin/document-set";
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    HttpEntity<OnyxDocumentSetUpdateRequestDto> entity = new HttpEntity<>(request, headers);
+    restTemplate.exchange(
+        url,
+        HttpMethod.PATCH,
+        entity,
+        Void.class
+    );
+  }
+
+  /**
+   * Fetches a document set by id from Onyx.
+   * Returns empty if not found.
+   */
+  public Optional<OnyxDocumentSetDto> getDocumentSetById(Integer id) {
+    if (id == null) {
+      return Optional.empty();
+    }
+    try {
+      List<OnyxDocumentSetDto> documentSets = fetchAllDocumentSets();
+      return documentSets.stream()
+          .filter(ds -> id.equals(ds.id()))
+          .findFirst();
+    } catch (Exception e) {
+      log.warn("Failed to fetch document set id={}: {}", id, e.getMessage());
+      return Optional.empty();
+    }
   }
 }
