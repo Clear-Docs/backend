@@ -5,7 +5,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import ru.cleardocs.backend.client.onyx.OnyxClient;
 import ru.cleardocs.backend.constant.PlanCode;
 import ru.cleardocs.backend.dto.GetMeDto;
 import ru.cleardocs.backend.dto.LimitDto;
@@ -17,13 +16,12 @@ import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.mapper.UserMapper;
 import ru.cleardocs.backend.repository.UserRepository;
 
-import java.util.Collections;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,14 +38,11 @@ class UserServiceTest {
   @Mock
   UserRepository userRepository;
 
-  @Mock
-  OnyxClient onyxClient;
-
   @InjectMocks
   UserService userService;
 
   @Test
-  void getMe_userWithoutDocSet_createsDocumentSetAndReturnsWithDocSetId() {
+  void getMe_userWithoutDocSet_returnsWithNullDocSetId() {
     UUID userId = UUID.randomUUID();
     Plan plan = planWithLimit();
     User user = User.builder()
@@ -58,7 +53,6 @@ class UserServiceTest {
         .docSetId(null)
         .build();
 
-    when(onyxClient.createDocumentSet(eq("Documents"), eq(""), eq(Collections.emptyList()))).thenReturn(42);
     when(userMapper.toDto(any())).thenAnswer(inv -> {
       User u = inv.getArgument(0);
       return new UserDto(u.getEmail(), u.getName(), planToDto(u.getPlan()), u.getDocSetId());
@@ -67,13 +61,12 @@ class UserServiceTest {
     GetMeDto result = userService.getMe(user);
 
     assertNotNull(result);
-    assertEquals(42, result.user().docSetId());
-    verify(onyxClient).createDocumentSet(eq("Documents"), eq(""), eq(Collections.emptyList()));
-    verify(userRepository).save(user);
+    assertNull(result.user().docSetId());
+    verify(userRepository, never()).save(any());
   }
 
   @Test
-  void getMe_userWithDocSet_returnsWithoutCallingOnyx() {
+  void getMe_userWithDocSet_returnsDocSetId() {
     Plan plan = planWithLimit();
     User user = User.builder()
         .id(UUID.randomUUID())
@@ -92,7 +85,6 @@ class UserServiceTest {
 
     assertNotNull(result);
     assertEquals(42, result.user().docSetId());
-    verify(onyxClient, never()).createDocumentSet(any(), any(), any());
     verify(userRepository, never()).save(any());
   }
 

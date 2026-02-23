@@ -4,7 +4,6 @@ import com.google.firebase.auth.FirebaseToken;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.cleardocs.backend.client.onyx.OnyxClient;
 import ru.cleardocs.backend.constant.PlanCode;
 import ru.cleardocs.backend.dto.GetMeDto;
 import ru.cleardocs.backend.entity.Plan;
@@ -12,43 +11,30 @@ import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.mapper.UserMapper;
 import ru.cleardocs.backend.repository.UserRepository;
 
-import java.util.Collections;
 import java.util.Optional;
 
 @Slf4j
 @Service
 public class UserService {
 
-  private static final String DEFAULT_DOCUMENT_SET_NAME = "Documents";
-
   private final UserMapper userMapper;
   private final PlanService planService;
   private final UserRepository userRepository;
-  private final OnyxClient onyxClient;
 
-  public UserService(UserMapper userMapper, PlanService planService, UserRepository userRepository, OnyxClient onyxClient) {
+  public UserService(UserMapper userMapper, PlanService planService, UserRepository userRepository) {
     this.userMapper = userMapper;
     this.planService = planService;
     this.userRepository = userRepository;
-    this.onyxClient = onyxClient;
   }
 
   @Transactional
   public GetMeDto getMe(User user) {
     log.info("getMe() - starts with user id = {}", user.getId());
-    if (user.getDocSetId() == null) {
-      ensureDocumentSetExists(user);
-    }
+    // Document set is created lazily when user uploads first file via ConnectorService.createFileConnector()
+    // Onyx API does not allow creating document sets with no connectors
     GetMeDto response = new GetMeDto(userMapper.toDto(user));
     log.info("getMe() - ends");
     return response;
-  }
-
-  private void ensureDocumentSetExists(User user) {
-    int newDocSetId = onyxClient.createDocumentSet(DEFAULT_DOCUMENT_SET_NAME, "", Collections.emptyList());
-    user.setDocSetId(newDocSetId);
-    userRepository.save(user);
-    log.info("getMe() - created document set id = {} for user id = {}", newDocSetId, user.getId());
   }
 
   @Transactional
