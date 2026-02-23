@@ -41,6 +41,7 @@ public class WithMockFirebaseUserSecurityContextFactory implements WithSecurityC
         .email(annotation.email())
         .name(annotation.name())
         .plan(plan)
+        .docSetId(annotation.docSetId() > 0 ? annotation.docSetId() : null)
         .build();
 
     var authentication = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
