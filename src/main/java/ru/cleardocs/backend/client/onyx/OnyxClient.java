@@ -27,19 +27,28 @@ import java.util.Optional;
 @Component
 public class OnyxClient {
 
+  private static final String PATH_DOCUMENT_SET = "/document-set";
+  private static final String PATH_ADMIN_DOCUMENT_SET = "/admin/document-set";
+  private static final String PATH_ADMIN_CONNECTOR_UPLOAD = "/admin/connector/file/upload";
+  private static final String PATH_ADMIN_CONNECTOR_CREATE = "/admin/connector-with-mock-credential";
+
   private final RestTemplate restTemplate = new RestTemplate();
   private final String baseUrl;
-  private final String documentSetsUrl;
+  private final String managePath;
   private final String apiKey;
 
   public OnyxClient(
       @Value("${onyx.base-url:http://155.212.162.11:3000/api}") String baseUrl,
-      @Value("${onyx.document-sets-path:/document-sets}") String documentSetsPath,
+      @Value("${onyx.manage-path:/manage}") String managePath,
       @Value("${onyx.api-key:}") String apiKey
   ) {
     this.baseUrl = baseUrl.replaceAll("/$", "");
-    this.documentSetsUrl = this.baseUrl + documentSetsPath;
+    this.managePath = managePath.replaceAll("/$", "");
     this.apiKey = apiKey;
+  }
+
+  private String url(String path) {
+    return baseUrl + managePath + path;
   }
 
   /**
@@ -73,7 +82,7 @@ public class OnyxClient {
     }
     HttpEntity<Void> entity = new HttpEntity<>(headers);
     ResponseEntity<List<OnyxDocumentSetDto>> response = restTemplate.exchange(
-        documentSetsUrl,
+        url(PATH_DOCUMENT_SET),
         HttpMethod.GET,
         entity,
         new ParameterizedTypeReference<List<OnyxDocumentSetDto>>() {}
@@ -97,7 +106,7 @@ public class OnyxClient {
    * for use in connector creation.
    */
   public OnyxFileUploadResponseDto uploadFiles(MultipartFile[] files) throws IOException {
-    String url = baseUrl + "/manage/admin/connector/file/upload";
+    String url = url(PATH_ADMIN_CONNECTOR_UPLOAD);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.MULTIPART_FORM_DATA);
     if (apiKey != null && !apiKey.isBlank()) {
@@ -140,7 +149,7 @@ public class OnyxClient {
       List<String> fileLocations,
       List<String> fileNames
   ) {
-    String url = baseUrl + "/manage/admin/connector-with-mock-credential";
+    String url = url(PATH_ADMIN_CONNECTOR_CREATE);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     if (apiKey != null && !apiKey.isBlank()) {
@@ -170,7 +179,7 @@ public class OnyxClient {
    * Returns the new document set id.
    */
   public int createDocumentSet(String name, String description, List<Integer> ccPairIds) {
-    String url = baseUrl + "/manage/admin/document-set";
+    String url = url(PATH_ADMIN_DOCUMENT_SET);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     if (apiKey != null && !apiKey.isBlank()) {
@@ -201,7 +210,7 @@ public class OnyxClient {
    * Updates a document set in Onyx with the new list of connector ids.
    */
   public void updateDocumentSet(OnyxDocumentSetUpdateRequestDto request) {
-    String url = baseUrl + "/manage/admin/document-set";
+    String url = url(PATH_ADMIN_DOCUMENT_SET);
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     if (apiKey != null && !apiKey.isBlank()) {
