@@ -190,25 +190,22 @@ class ConnectorControllerTest {
 
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
-  void deleteConnector_connectorWithOthers_updatesDocumentSet() throws Exception {
+  void deleteConnector_deletesConnectorInOnyx() throws Exception {
     EntityConnectorDto connector1 = new EntityConnectorDto(123, "My Connector", "file");
     EntityConnectorDto connector2 = new EntityConnectorDto(456, "Other Connector", "file");
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of(connector1, connector2));
-    when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
-        new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
-    ));
 
     mockMvc.perform(delete("/api/v1/connectors/123")
             .with(securityContext(SecurityContextHolder.getContext())))
         .andExpect(status().isNoContent());
 
     verify(onyxClient).deleteConnector(123);
-    verify(onyxClient).updateDocumentSet(any());
+    verify(onyxClient, never()).updateDocumentSet(any());
   }
 
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
-  void deleteConnector_lastConnector_skipsDocumentSetUpdate() throws Exception {
+  void deleteConnector_lastConnector_deletesConnectorInOnyx() throws Exception {
     EntityConnectorDto connector = new EntityConnectorDto(123, "My Connector", "file");
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of(connector));
 

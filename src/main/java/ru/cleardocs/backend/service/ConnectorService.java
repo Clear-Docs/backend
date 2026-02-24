@@ -135,27 +135,6 @@ public class ConnectorService {
 
     onyxClient.deleteConnector(connectorId);
 
-    List<Integer> remainingCcPairIds = connectors.stream()
-        .map(EntityConnectorDto::id)
-        .filter(id -> id != null && id != connectorId)
-        .collect(Collectors.toList());
-
-    if (!remainingCcPairIds.isEmpty()) {
-      var docSetOpt = onyxClient.getDocumentSetById(user.getDocSetId());
-      if (docSetOpt.isPresent()) {
-        var docSet = docSetOpt.get();
-        OnyxDocumentSetUpdateRequestDto updateRequest = new OnyxDocumentSetUpdateRequestDto(
-            docSet.id(),
-            docSet.description() != null ? docSet.description() : "",
-            remainingCcPairIds,
-            docSet.isPublic(),
-            docSet.users(),
-            docSet.groups()
-        );
-        onyxClient.updateDocumentSet(updateRequest);
-      }
-    }
-
     log.info("deleteConnector() - ends, connector {} deleted", connectorId);
   }
 
