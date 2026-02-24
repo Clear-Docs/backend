@@ -31,7 +31,7 @@ public class OnyxClient {
   private static final String PATH_ADMIN_DOCUMENT_SET = "/admin/document-set";
   private static final String PATH_ADMIN_CONNECTOR_UPLOAD = "/admin/connector/file/upload";
   private static final String PATH_ADMIN_CONNECTOR_CREATE = "/admin/connector-with-mock-credential";
-  private static final String PATH_CONNECTOR_DELETE = "/v1/connectors";
+  private static final String PATH_ADMIN_CONNECTOR_DELETE = "/admin/connector";
 
   private final RestTemplate restTemplate = new RestTemplate();
   private final String baseUrl;
@@ -50,13 +50,6 @@ public class OnyxClient {
 
   private String url(String path) {
     return baseUrl + managePath + path;
-  }
-
-  /**
-   * URL without managePath for endpoints like DELETE /api/v1/connectors/{id}
-   */
-  private String urlWithoutManage(String path) {
-    return baseUrl + path;
   }
 
   /**
@@ -184,10 +177,10 @@ public class OnyxClient {
 
   /**
    * Deletes a connector in Onyx.
-   * Onyx API: DELETE /api/v1/connectors/{connector_id}
+   * Onyx API: DELETE /manage/admin/connector/{connector_id}
    */
   public void deleteConnector(int connectorId) {
-    String deleteUrl = urlWithoutManage(PATH_CONNECTOR_DELETE + "/" + connectorId);
+    String deleteUrl = url(PATH_ADMIN_CONNECTOR_DELETE + "/" + connectorId);
     HttpHeaders headers = new HttpHeaders();
     if (apiKey != null && !apiKey.isBlank()) {
       headers.setBearerAuth(apiKey);
