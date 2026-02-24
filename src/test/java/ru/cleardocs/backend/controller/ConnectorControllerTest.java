@@ -30,6 +30,7 @@ import java.util.Optional;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
@@ -176,16 +177,13 @@ class ConnectorControllerTest {
   void deleteConnector_authenticatedUser_connectorBelongsToUser_returns204() throws Exception {
     EntityConnectorDto connector = new EntityConnectorDto(123, "My Connector", "file");
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of(connector));
-    when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
-        new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
-    ));
 
     mockMvc.perform(delete("/api/v1/connectors/123")
             .with(securityContext(SecurityContextHolder.getContext())))
         .andExpect(status().isNoContent());
 
     verify(onyxClient).deleteConnector(123);
-    verify(onyxClient).updateDocumentSet(any());
+    verify(onyxClient, never()).updateDocumentSet(any());
   }
 
   @Test
