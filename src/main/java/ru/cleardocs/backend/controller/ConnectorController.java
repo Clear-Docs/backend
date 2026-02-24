@@ -4,7 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -44,5 +46,15 @@ public class ConnectorController {
     log.info("createFileConnector() - starts with user id = {}, name = {}", user.getId(), name);
     CreateConnectorResponseDto response = connectorService.createFileConnector(user, name, files);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @DeleteMapping("/{connectorId}")
+  public ResponseEntity<Void> deleteConnector(
+      @AuthenticationPrincipal User user,
+      @PathVariable int connectorId
+  ) {
+    log.info("deleteConnector() - starts with user id = {}, connectorId = {}", user.getId(), connectorId);
+    connectorService.deleteConnector(user, connectorId);
+    return ResponseEntity.noContent().build();
   }
 }
