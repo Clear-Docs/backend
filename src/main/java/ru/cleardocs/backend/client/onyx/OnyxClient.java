@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cleardocs.backend.dto.EntityConnectorDto;
@@ -33,7 +34,8 @@ public class OnyxClient {
   private static final String PATH_ADMIN_CONNECTOR_CREATE = "/admin/connector-with-mock-credential";
   private static final String PATH_ADMIN_CONNECTOR_DELETE = "/admin/connector";
 
-  private final RestTemplate restTemplate = new RestTemplate();
+  private final RestTemplate restTemplate =
+      new RestTemplate(new HttpComponentsClientHttpRequestFactory());
   private final String baseUrl;
   private final String managePath;
   private final String apiKey;
