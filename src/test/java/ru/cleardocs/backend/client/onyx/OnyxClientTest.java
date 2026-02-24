@@ -1,0 +1,66 @@
+package ru.cleardocs.backend.client.onyx;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
+
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class OnyxClientTest {
+
+  @Autowired
+  OnyxClient onyxClient;
+
+  @Autowired
+  RestTemplate restTemplate;
+
+  private MockRestServiceServer mockServer;
+
+  @BeforeEach
+  void setUp() {
+    mockServer = MockRestServiceServer.createServer(restTemplate);
+  }
+
+  @Test
+  void getCcPairStatus_whenOnyxReturnsNullStatus_throwsIllegalStateException() {
+    String responseBody = """
+        [{"indexing_statuses":[{"cc_pair_id":123,"cc_pair_status":null}]}]
+        """;
+
+    mockServer.expect(requestTo(containsString("indexing-status")))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess(responseBody, MediaType.APPLICATION_JSON));
+
+    IllegalStateException thrown = assertThrows(IllegalStateException.class, () ->
+        onyxClient.getCcPairStatus(123)
+    );
+
+    assertTrue(thrown.getMessage().contains("Onyx returned null cc_pair_status for cc_pair_id=123"));
+  }
+
+  @TestConfiguration
+  static class TestConfig {
+
+    @Bean
+    @Primary
+    RestTemplate restTemplate() {
+      return new RestTemplate();
+    }
+  }
+}
