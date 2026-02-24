@@ -17,6 +17,8 @@ import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cleardocs.backend.dto.EntityConnectorDto;
+import ru.cleardocs.backend.exception.BadRequestException;
+import ru.cleardocs.backend.exception.NotFoundException;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,7 +34,10 @@ public class OnyxClient {
   private static final String PATH_ADMIN_DOCUMENT_SET = "/admin/document-set";
   private static final String PATH_ADMIN_CONNECTOR_UPLOAD = "/admin/connector/file/upload";
   private static final String PATH_ADMIN_CONNECTOR_CREATE = "/admin/connector-with-mock-credential";
-  private static final String PATH_ADMIN_CONNECTOR_DELETE = "/admin/connector";
+  private static final String PATH_ADMIN_CONNECTOR_STATUS = "/admin/connector/status";
+  private static final String PATH_ADMIN_INDEXING_STATUS = "/admin/connector/indexing-status";
+  private static final String PATH_ADMIN_DELETION_ATTEMPT = "/admin/deletion-attempt";
+  private static final String PATH_ADMIN_CC_PAIR = "/admin/cc-pair";
 
   private final RestTemplate restTemplate =
       new RestTemplate(new HttpComponentsClientHttpRequestFactory());
@@ -178,19 +183,96 @@ public class OnyxClient {
   }
 
   /**
-   * Deletes a connector in Onyx.
-   * Onyx API: DELETE /manage/admin/connector/{connector_id}
+   * Deletes a connector in Onyx via deletion-attempt (same as Onyx UI).
+   * Requires connector_id and credential_id from connector status.
+   * EntityConnectorDto.id is cc_pair_id; we resolve to connector_id/credential_id.
+   * Connector must be PAUSED before deletion; otherwise throws BadRequestException.
    */
-  public void deleteConnector(int connectorId) {
-    String deleteUrl = url(PATH_ADMIN_CONNECTOR_DELETE + "/" + connectorId);
+  public void deleteConnector(int ccPairId) {
+    String ccPairStatus = getCcPairStatus(ccPairId);
+    if (!"PAUSED".equalsIgnoreCase(ccPairStatus)) {
+      throw new BadRequestException("Connector must be paused before deletion. Current status: " + ccPairStatus);
+    }
+
+    List<OnyxConnectorStatusDto> statuses = fetchConnectorStatus();
+    OnyxConnectorStatusDto status = statuses.stream()
+        .filter(s -> ccPairId == s.ccPairId())
+        .findFirst()
+        .orElseThrow(() -> new NotFoundException("Connector not found in Onyx status: cc_pair_id=" + ccPairId));
+
+    if (status.connector() == null || status.connector().id() == null
+        || status.credential() == null || status.credential().id() == null) {
+      throw new IllegalStateException("Connector or credential id missing for cc_pair_id=" + ccPairId);
+    }
+
+    int connectorId = status.connector().id();
+    int credentialId = status.credential().id();
+    createDeletionAttempt(connectorId, credentialId);
+  }
+
+  /**
+   * Fetches cc_pair_status from Onyx indexing-status API.
+   * Returns status string (e.g. PAUSED, ACTIVE, SCHEDULED) or null if not found.
+   */
+  public String getCcPairStatus(int ccPairId) {
+    List<OnyxConnectorIndexingStatusLiteResponseDto> responses = fetchIndexingStatus();
+    for (OnyxConnectorIndexingStatusLiteResponseDto resp : responses) {
+      for (OnyxConnectorIndexingStatusLiteDto item : resp.indexingStatuses()) {
+        if (ccPairId == item.ccPairId()) {
+          return item.ccPairStatus() != null ? item.ccPairStatus() : "UNKNOWN";
+        }
+      }
+    }
+    throw new NotFoundException("Connector not found in Onyx indexing status: cc_pair_id=" + ccPairId);
+  }
+
+  private List<OnyxConnectorIndexingStatusLiteResponseDto> fetchIndexingStatus() {
+    String requestUrl = url(PATH_ADMIN_INDEXING_STATUS);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    OnyxIndexingStatusRequestDto request = OnyxIndexingStatusRequestDto.allConnectors();
+    HttpEntity<OnyxIndexingStatusRequestDto> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<List<OnyxConnectorIndexingStatusLiteResponseDto>> response = restTemplate.exchange(
+        requestUrl,
+        HttpMethod.POST,
+        entity,
+        new ParameterizedTypeReference<List<OnyxConnectorIndexingStatusLiteResponseDto>>() {}
+    );
+    return response.getBody() != null ? response.getBody() : List.of();
+  }
+
+  private List<OnyxConnectorStatusDto> fetchConnectorStatus() {
+    String requestUrl = url(PATH_ADMIN_CONNECTOR_STATUS);
     HttpHeaders headers = new HttpHeaders();
     if (apiKey != null && !apiKey.isBlank()) {
       headers.setBearerAuth(apiKey);
     }
     HttpEntity<Void> entity = new HttpEntity<>(headers);
+    ResponseEntity<List<OnyxConnectorStatusDto>> response = restTemplate.exchange(
+        requestUrl,
+        HttpMethod.GET,
+        entity,
+        new ParameterizedTypeReference<List<OnyxConnectorStatusDto>>() {}
+    );
+    return response.getBody() != null ? response.getBody() : List.of();
+  }
+
+  private void createDeletionAttempt(int connectorId, int credentialId) {
+    String requestUrl = url(PATH_ADMIN_DELETION_ATTEMPT);
+    log.info("Onyx API request: POST {} connector_id={} credential_id={}", requestUrl, connectorId, credentialId);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    OnyxDeletionAttemptRequestDto request = new OnyxDeletionAttemptRequestDto(connectorId, credentialId);
+    HttpEntity<OnyxDeletionAttemptRequestDto> entity = new HttpEntity<>(request, headers);
     restTemplate.exchange(
-        deleteUrl,
-        HttpMethod.DELETE,
+        requestUrl,
+        HttpMethod.POST,
         entity,
         Void.class
     );
@@ -246,6 +328,38 @@ public class OnyxClient {
         entity,
         Void.class
     );
+  }
+
+  /**
+   * Updates connector (cc_pair) status in Onyx.
+   * Onyx API: PUT /manage/admin/cc-pair/{cc_pair_id}/status with {"status": "PAUSED"|"ACTIVE"|...}
+   */
+  public void updateConnectorStatus(int ccPairId, String onyxStatus) {
+    String requestUrl = url(PATH_ADMIN_CC_PAIR + "/" + ccPairId + "/status");
+    log.info("Onyx API request: PUT {} status={}", requestUrl, onyxStatus);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    OnyxCcStatusUpdateRequestDto request = new OnyxCcStatusUpdateRequestDto(onyxStatus);
+    HttpEntity<OnyxCcStatusUpdateRequestDto> entity = new HttpEntity<>(request, headers);
+    restTemplate.exchange(
+        requestUrl,
+        HttpMethod.PUT,
+        entity,
+        Void.class
+    );
+  }
+
+  /** Pauses a connector in Onyx. */
+  public void pauseConnector(int ccPairId) {
+    updateConnectorStatus(ccPairId, "PAUSED");
+  }
+
+  /** Resumes (activates) a connector in Onyx. */
+  public void resumeConnector(int ccPairId) {
+    updateConnectorStatus(ccPairId, "ACTIVE");
   }
 
   /**

@@ -6,7 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cleardocs.backend.dto.CreateConnectorResponseDto;
 import ru.cleardocs.backend.dto.GetConnectorsDto;
+import ru.cleardocs.backend.dto.UpdateConnectorRequestDto;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.service.ConnectorService;
 
@@ -46,6 +49,17 @@ public class ConnectorController {
     log.info("createFileConnector() - starts with user id = {}, name = {}", user.getId(), name);
     CreateConnectorResponseDto response = connectorService.createFileConnector(user, name, files);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  @PatchMapping("/{connectorId}")
+  public ResponseEntity<Void> updateConnector(
+      @AuthenticationPrincipal User user,
+      @PathVariable int connectorId,
+      @RequestBody UpdateConnectorRequestDto body
+  ) {
+    log.info("updateConnector() - starts with user id = {}, connectorId = {}, body = {}", user.getId(), connectorId, body);
+    connectorService.updateConnector(user, connectorId, body);
+    return ResponseEntity.noContent().build();
   }
 
   @DeleteMapping("/{connectorId}")
