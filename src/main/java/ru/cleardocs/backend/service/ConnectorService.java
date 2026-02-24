@@ -11,6 +11,7 @@ import ru.cleardocs.backend.client.onyx.OnyxFileUploadResponseDto;
 import ru.cleardocs.backend.dto.CreateConnectorResponseDto;
 import ru.cleardocs.backend.dto.EntityConnectorDto;
 import ru.cleardocs.backend.dto.GetConnectorsDto;
+import ru.cleardocs.backend.dto.UpdateConnectorRequestDto;
 import ru.cleardocs.backend.entity.Limit;
 import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
@@ -133,7 +134,37 @@ public class ConnectorService {
     }
 
     onyxClient.deleteConnector(connectorId);
+
     log.info("deleteConnector() - ends, connector {} deleted", connectorId);
+  }
+
+  public void updateConnector(User user, int connectorId, UpdateConnectorRequestDto request) {
+    log.info("updateConnector() - starts with user id = {}, docSetId = {}, connectorId = {}, status = {}",
+        user.getId(), user.getDocSetId(), connectorId, request != null ? request.status() : null);
+
+    if (user.getDocSetId() == null) {
+      throw new NotFoundException("User has no document set");
+    }
+
+    List<EntityConnectorDto> connectors = onyxClient.getConnectorsByDocSetId(user.getDocSetId());
+    boolean connectorBelongsToUser = connectors.stream()
+        .anyMatch(c -> c.id() != null && c.id() == connectorId);
+    if (!connectorBelongsToUser) {
+      throw new NotFoundException("Connector not found");
+    }
+
+    if (request == null || request.status() == null || request.status().isBlank()) {
+      throw new BadRequestException("status is required (paused or active)");
+    }
+    if (request.isPaused()) {
+      onyxClient.pauseConnector(connectorId);
+      log.info("updateConnector() - connector {} paused", connectorId);
+    } else if (request.isActive()) {
+      onyxClient.resumeConnector(connectorId);
+      log.info("updateConnector() - connector {} resumed", connectorId);
+    } else {
+      throw new BadRequestException("status must be 'paused' or 'active', got: " + request.status());
+    }
   }
 
   private void createAndLinkDocumentSet(User user, int ccPairId) {
