@@ -84,7 +84,7 @@ class ConnectorControllerTest {
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void getConnectors_limitReached_returnsCanAddFalse() throws Exception {
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(
-        List.of(new EntityConnectorDto(1, "Connector 1", "file"))
+        List.of(new EntityConnectorDto(1, "Connector 1", "file", "ACTIVE"))
     );
 
     mockMvc.perform(get("/api/v1/connectors")
@@ -92,6 +92,7 @@ class ConnectorControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.connectors").isArray())
         .andExpect(jsonPath("$.connectors.length()").value(1))
+        .andExpect(jsonPath("$.connectors[0].status").value("ACTIVE"))
         .andExpect(jsonPath("$.canAdd").value(false));
   }
 
@@ -176,7 +177,7 @@ class ConnectorControllerTest {
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void updateConnector_statusPaused_putsConnectorOnPause() throws Exception {
-    EntityConnectorDto connector = new EntityConnectorDto(123, "My Connector", "file");
+    EntityConnectorDto connector = new EntityConnectorDto(123, "My Connector", "file", "ACTIVE");
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of(connector));
 
     mockMvc.perform(patch("/api/v1/connectors/123")
@@ -191,8 +192,8 @@ class ConnectorControllerTest {
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void deleteConnector_deletesConnectorInOnyx() throws Exception {
-    EntityConnectorDto connector1 = new EntityConnectorDto(123, "My Connector", "file");
-    EntityConnectorDto connector2 = new EntityConnectorDto(456, "Other Connector", "file");
+    EntityConnectorDto connector1 = new EntityConnectorDto(123, "My Connector", "file", "ACTIVE");
+    EntityConnectorDto connector2 = new EntityConnectorDto(456, "Other Connector", "file", "ACTIVE");
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of(connector1, connector2));
 
     mockMvc.perform(delete("/api/v1/connectors/123")
@@ -206,7 +207,7 @@ class ConnectorControllerTest {
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void deleteConnector_lastConnector_deletesConnectorInOnyx() throws Exception {
-    EntityConnectorDto connector = new EntityConnectorDto(123, "My Connector", "file");
+    EntityConnectorDto connector = new EntityConnectorDto(123, "My Connector", "file", "ACTIVE");
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of(connector));
 
     mockMvc.perform(delete("/api/v1/connectors/123")
@@ -221,7 +222,7 @@ class ConnectorControllerTest {
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void deleteConnector_connectorNotInUserDocSet_returns404() throws Exception {
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(
-        List.of(new EntityConnectorDto(456, "Other Connector", "file"))
+        List.of(new EntityConnectorDto(456, "Other Connector", "file", "ACTIVE"))
     );
 
     mockMvc.perform(delete("/api/v1/connectors/123")

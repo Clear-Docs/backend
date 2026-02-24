@@ -1,6 +1,7 @@
 package ru.cleardocs.backend.client.onyx;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
@@ -13,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cleardocs.backend.dto.EntityConnectorDto;
@@ -23,7 +23,9 @@ import ru.cleardocs.backend.exception.NotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -39,8 +41,7 @@ public class OnyxClient {
   private static final String PATH_ADMIN_DELETION_ATTEMPT = "/admin/deletion-attempt";
   private static final String PATH_ADMIN_CC_PAIR = "/admin/cc-pair";
 
-  private final RestTemplate restTemplate =
-      new RestTemplate(new HttpComponentsClientHttpRequestFactory());
+  private final RestTemplate restTemplate;
   private final String baseUrl;
   private final String managePath;
   private final String apiKey;
@@ -48,8 +49,10 @@ public class OnyxClient {
   public OnyxClient(
       @Value("${onyx.base-url:http://155.212.162.11:3000/api}") String baseUrl,
       @Value("${onyx.manage-path:/manage}") String managePath,
-      @Value("${onyx.api-key:}") String apiKey
+      @Value("${onyx.api-key:}") String apiKey,
+      @Autowired RestTemplate restTemplate
   ) {
+    this.restTemplate = restTemplate;
     this.baseUrl = baseUrl.replaceAll("/$", "");
     this.managePath = managePath.replaceAll("/$", "");
     this.apiKey = apiKey;
@@ -76,7 +79,8 @@ public class OnyxClient {
         log.debug("Document set with id {} not found in Onyx response", docSetId);
         return List.of();
       }
-      return mapToEntityConnectors(ourDocSet.get());
+      Map<Integer, String> statusByCcPairId = buildStatusByCcPairId();
+      return mapToEntityConnectors(ourDocSet.get(), statusByCcPairId);
     } catch (Exception e) {
       log.warn("Failed to fetch connectors from Onyx for docSetId={}: {}", docSetId, e.getMessage());
       return List.of();
@@ -98,13 +102,30 @@ public class OnyxClient {
     return response.getBody() != null ? response.getBody() : List.of();
   }
 
-  private List<EntityConnectorDto> mapToEntityConnectors(OnyxDocumentSetDto docSet) {
+  private Map<Integer, String> buildStatusByCcPairId() {
+    Map<Integer, String> statusByCcPairId = new HashMap<>();
+    for (OnyxConnectorIndexingStatusLiteResponseDto resp : fetchIndexingStatus()) {
+      for (OnyxConnectorIndexingStatusLiteDto item : resp.indexingStatuses()) {
+        if (item.ccPairId() != null) {
+          if (item.ccPairStatus() == null) {
+            throw new IllegalStateException("Onyx returned null cc_pair_status for cc_pair_id=" + item.ccPairId());
+          }
+          statusByCcPairId.put(item.ccPairId(), item.ccPairStatus());
+        }
+      }
+    }
+    return statusByCcPairId;
+  }
+
+  private List<EntityConnectorDto> mapToEntityConnectors(OnyxDocumentSetDto docSet, Map<Integer, String> statusByCcPairId) {
     List<EntityConnectorDto> result = new ArrayList<>();
     for (OnyxConnectorSummaryDto cc : docSet.ccPairSummaries()) {
-      result.add(new EntityConnectorDto(cc.id(), cc.name(), cc.source()));
+      String status = cc.id() != null ? statusByCcPairId.getOrDefault(cc.id(), "UNKNOWN") : "UNKNOWN";
+      result.add(new EntityConnectorDto(cc.id(), cc.name(), cc.source(), status));
     }
     for (OnyxConnectorSummaryDto fc : docSet.federatedConnectorSummaries()) {
-      result.add(new EntityConnectorDto(fc.id(), fc.name(), fc.source()));
+      String status = fc.id() != null ? statusByCcPairId.getOrDefault(fc.id(), "UNKNOWN") : "UNKNOWN";
+      result.add(new EntityConnectorDto(fc.id(), fc.name(), fc.source(), status));
     }
     return result;
   }
@@ -212,14 +233,19 @@ public class OnyxClient {
 
   /**
    * Fetches cc_pair_status from Onyx indexing-status API.
-   * Returns status string (e.g. PAUSED, ACTIVE, SCHEDULED) or null if not found.
+   * Returns status string (e.g. PAUSED, ACTIVE, SCHEDULED).
+   * Throws IllegalStateException if Onyx returns null cc_pair_status.
+   * Throws NotFoundException if connector not found.
    */
   public String getCcPairStatus(int ccPairId) {
     List<OnyxConnectorIndexingStatusLiteResponseDto> responses = fetchIndexingStatus();
     for (OnyxConnectorIndexingStatusLiteResponseDto resp : responses) {
       for (OnyxConnectorIndexingStatusLiteDto item : resp.indexingStatuses()) {
         if (ccPairId == item.ccPairId()) {
-          return item.ccPairStatus() != null ? item.ccPairStatus() : "UNKNOWN";
+          if (item.ccPairStatus() == null) {
+            throw new IllegalStateException("Onyx returned null cc_pair_status for cc_pair_id=" + ccPairId);
+          }
+          return item.ccPairStatus();
         }
       }
     }
