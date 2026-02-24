@@ -15,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.cleardocs.backend.client.onyx.OnyxClient;
+import ru.cleardocs.backend.dto.EntityConnectorDto;
 import ru.cleardocs.backend.client.onyx.OnyxCreateConnectorResponseDto;
 import ru.cleardocs.backend.client.onyx.OnyxDocumentSetDto;
 import ru.cleardocs.backend.client.onyx.OnyxFileUploadResponseDto;
@@ -32,6 +33,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -59,7 +61,8 @@ class ConnectorControllerTest {
             .with(securityContext(SecurityContextHolder.getContext())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.connectors").isArray())
-        .andExpect(jsonPath("$.connectors").isEmpty());
+        .andExpect(jsonPath("$.connectors").isEmpty())
+        .andExpect(jsonPath("$.canAdd").value(true));
   }
 
   @Test
@@ -71,7 +74,23 @@ class ConnectorControllerTest {
             .with(securityContext(SecurityContextHolder.getContext())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.connectors").isArray())
-        .andExpect(jsonPath("$.connectors").isEmpty());
+        .andExpect(jsonPath("$.connectors").isEmpty())
+        .andExpect(jsonPath("$.canAdd").value(true));
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void getConnectors_limitReached_returnsCanAddFalse() throws Exception {
+    when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(
+        List.of(new EntityConnectorDto(1, "Connector 1", "file"))
+    );
+
+    mockMvc.perform(get("/api/v1/connectors")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.connectors").isArray())
+        .andExpect(jsonPath("$.connectors.length()").value(1))
+        .andExpect(jsonPath("$.canAdd").value(false));
   }
 
   @Test
@@ -150,5 +169,48 @@ class ConnectorControllerTest {
     User savedUser = captor.getValue();
     assertNotNull(savedUser.getDocSetId());
     assertEquals(123, savedUser.getDocSetId());
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void deleteConnector_authenticatedUser_connectorBelongsToUser_returns204() throws Exception {
+    EntityConnectorDto connector = new EntityConnectorDto(123, "My Connector", "file");
+    when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of(connector));
+    when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
+        new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
+    ));
+
+    mockMvc.perform(delete("/api/v1/connectors/123")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isNoContent());
+
+    verify(onyxClient).deleteConnector(123);
+    verify(onyxClient).updateDocumentSet(any());
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void deleteConnector_connectorNotInUserDocSet_returns404() throws Exception {
+    when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(
+        List.of(new EntityConnectorDto(456, "Other Connector", "file"))
+    );
+
+    mockMvc.perform(delete("/api/v1/connectors/123")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE")
+  void deleteConnector_userWithoutDocSet_returns404() throws Exception {
+    mockMvc.perform(delete("/api/v1/connectors/123")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void deleteConnector_unauthenticated_returns401() throws Exception {
+    mockMvc.perform(delete("/api/v1/connectors/123"))
+        .andExpect(status().isUnauthorized());
   }
 }

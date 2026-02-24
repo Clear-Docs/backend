@@ -15,6 +15,7 @@ import ru.cleardocs.backend.entity.Limit;
 import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
+import ru.cleardocs.backend.exception.NotFoundException;
 import ru.cleardocs.backend.repository.UserRepository;
 
 import java.io.IOException;
@@ -39,13 +40,24 @@ public class ConnectorService {
 
   public GetConnectorsDto getConnectors(User user) {
     log.info("getConnectors() - starts with user id = {}, docSetId = {}", user.getId(), user.getDocSetId());
+    List<EntityConnectorDto> connectors;
     if (user.getDocSetId() == null) {
       log.info("getConnectors() - user has no docSetId, returning empty list");
-      return new GetConnectorsDto(Collections.emptyList());
+      connectors = Collections.emptyList();
+    } else {
+      connectors = onyxClient.getConnectorsByDocSetId(user.getDocSetId());
     }
-    List<EntityConnectorDto> connectors = onyxClient.getConnectorsByDocSetId(user.getDocSetId());
-    log.info("getConnectors() - ends with connectors count = {}", connectors.size());
-    return new GetConnectorsDto(connectors);
+
+    int maxConnectors = 0;
+    Plan plan = user.getPlan();
+    if (plan != null && plan.getLimit() != null) {
+      maxConnectors = plan.getLimit().getMaxConnectors();
+    }
+    boolean canAdd = connectors.size() < maxConnectors;
+
+    log.info("getConnectors() - ends with connectors count = {}, maxConnectors = {}, canAdd = {}",
+        connectors.size(), maxConnectors, canAdd);
+    return new GetConnectorsDto(connectors, canAdd);
   }
 
   @Transactional
@@ -103,6 +115,45 @@ public class ConnectorService {
 
     log.info("createFileConnector() - ends with cc_pair_id = {}", ccPairId);
     return new CreateConnectorResponseDto(ccPairId, name, "file");
+  }
+
+  public void deleteConnector(User user, int connectorId) {
+    log.info("deleteConnector() - starts with user id = {}, docSetId = {}, connectorId = {}",
+        user.getId(), user.getDocSetId(), connectorId);
+
+    if (user.getDocSetId() == null) {
+      throw new NotFoundException("User has no document set");
+    }
+
+    List<EntityConnectorDto> connectors = onyxClient.getConnectorsByDocSetId(user.getDocSetId());
+    boolean connectorBelongsToUser = connectors.stream()
+        .anyMatch(c -> c.id() != null && c.id() == connectorId);
+    if (!connectorBelongsToUser) {
+      throw new NotFoundException("Connector not found");
+    }
+
+    onyxClient.deleteConnector(connectorId);
+
+    List<Integer> remainingCcPairIds = connectors.stream()
+        .map(EntityConnectorDto::id)
+        .filter(id -> id != null && id != connectorId)
+        .collect(Collectors.toList());
+
+    var docSetOpt = onyxClient.getDocumentSetById(user.getDocSetId());
+    if (docSetOpt.isPresent()) {
+      var docSet = docSetOpt.get();
+      OnyxDocumentSetUpdateRequestDto updateRequest = new OnyxDocumentSetUpdateRequestDto(
+          docSet.id(),
+          docSet.description() != null ? docSet.description() : "",
+          remainingCcPairIds,
+          docSet.isPublic(),
+          docSet.users(),
+          docSet.groups()
+      );
+      onyxClient.updateDocumentSet(updateRequest);
+    }
+
+    log.info("deleteConnector() - ends, connector {} deleted", connectorId);
   }
 
   private void createAndLinkDocumentSet(User user, int ccPairId) {

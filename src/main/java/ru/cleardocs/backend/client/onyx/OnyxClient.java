@@ -31,6 +31,7 @@ public class OnyxClient {
   private static final String PATH_ADMIN_DOCUMENT_SET = "/admin/document-set";
   private static final String PATH_ADMIN_CONNECTOR_UPLOAD = "/admin/connector/file/upload";
   private static final String PATH_ADMIN_CONNECTOR_CREATE = "/admin/connector-with-mock-credential";
+  private static final String PATH_ADMIN_CONNECTOR_DELETE = "/admin/connector";
 
   private final RestTemplate restTemplate = new RestTemplate();
   private final String baseUrl;
@@ -172,6 +173,25 @@ public class OnyxClient {
       throw new RuntimeException("Onyx create connector returned empty response");
     }
     return response.getBody();
+  }
+
+  /**
+   * Deletes a connector in Onyx.
+   * Onyx API: DELETE /manage/admin/connector/{connector_id}
+   */
+  public void deleteConnector(int connectorId) {
+    String deleteUrl = url(PATH_ADMIN_CONNECTOR_DELETE + "/" + connectorId);
+    HttpHeaders headers = new HttpHeaders();
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    HttpEntity<Void> entity = new HttpEntity<>(headers);
+    restTemplate.exchange(
+        deleteUrl,
+        HttpMethod.DELETE,
+        entity,
+        Void.class
+    );
   }
 
   /**
