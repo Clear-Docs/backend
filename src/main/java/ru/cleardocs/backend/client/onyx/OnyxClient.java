@@ -208,6 +208,7 @@ public class OnyxClient {
 
   /**
    * Updates a document set in Onyx with the new list of connector ids.
+   * Onyx API expects PATCH (not POST) per Swagger: /manage/admin/document-set
    */
   public void updateDocumentSet(OnyxDocumentSetUpdateRequestDto request) {
     String url = url(PATH_ADMIN_DOCUMENT_SET);
@@ -219,7 +220,7 @@ public class OnyxClient {
     HttpEntity<OnyxDocumentSetUpdateRequestDto> entity = new HttpEntity<>(request, headers);
     restTemplate.exchange(
         url,
-        HttpMethod.POST,
+        HttpMethod.PATCH,
         entity,
         Void.class
     );

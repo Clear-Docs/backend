@@ -1,5 +1,9 @@
 # Clear-Docs Backend
 
+## Swagger
+
+Onyx API документация: http://155.212.162.11:3000/api/docs
+
 ## Onyx API
 
 Base URL: http://155.212.162.11:3000/api/

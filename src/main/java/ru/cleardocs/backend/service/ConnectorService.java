@@ -119,9 +119,16 @@ public class ConnectorService {
     List<Integer> allCcPairIds = new ArrayList<>(existingCcPairIds);
     allCcPairIds.add(ccPairId);
 
-    var docSet = onyxClient.getDocumentSetById(user.getDocSetId())
-        .orElseThrow(() -> new RuntimeException("Document set not found in Onyx for docSetId=" + user.getDocSetId()));
+    var docSetOpt = onyxClient.getDocumentSetById(user.getDocSetId());
+    if (docSetOpt.isEmpty()) {
+      // Document set was deleted in Onyx or data inconsistency - auto-heal by creating a new one
+      log.warn("createFileConnector() - document set id = {} not found in Onyx, creating new document set for user id = {}",
+          user.getDocSetId(), user.getId());
+      createAndLinkDocumentSet(user, ccPairId);
+      return;
+    }
 
+    var docSet = docSetOpt.get();
     OnyxDocumentSetUpdateRequestDto updateRequest = new OnyxDocumentSetUpdateRequestDto(
         docSet.id(),
         docSet.description() != null ? docSet.description() : "",
