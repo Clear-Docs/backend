@@ -1,5 +1,6 @@
 package ru.cleardocs.backend.client.onyx;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +43,7 @@ public class OnyxClient {
   private static final String PATH_ADMIN_CC_PAIR = "/admin/cc-pair";
   private static final String PATH_ADMIN_API_KEY = "/admin/api-key";
   private static final String PATH_PERSONA = "/persona";
+  private static final String PATH_CHAT_CREATE_SESSION = "/chat/create-chat-session";
 
   private final RestTemplate restTemplate;
   private final String baseUrl;
@@ -450,6 +452,28 @@ public class OnyxClient {
       throw new RuntimeException("Onyx create persona returned empty id");
     }
     return body.id();
+  }
+
+  /**
+   * Creates a chat session in Onyx. Proxies POST /chat/create-chat-session.
+   * Uses the provided bearerToken (user's Onyx API key) for Authorization.
+   * Passes request body and response through unchanged.
+   */
+  public Map<String, Object> createChatSession(String bearerToken, @NotNull Map<String, Object> request) {
+    String requestUrl = urlApi(PATH_CHAT_CREATE_SESSION);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (bearerToken != null && !bearerToken.isBlank()) {
+      headers.setBearerAuth(bearerToken);
+    }
+    HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+        requestUrl,
+        HttpMethod.POST,
+        entity,
+        new ParameterizedTypeReference<Map<String, Object>>() {}
+    );
+    return response.getBody();
   }
 
   /**

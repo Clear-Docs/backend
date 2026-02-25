@@ -1,5 +1,6 @@
 package ru.cleardocs.backend.service;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,6 +12,7 @@ import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.repository.UserRepository;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -59,5 +61,16 @@ public class ChatService {
 
     log.info("getChatCredentials() - ends with apiKey set, personaId = {}", user.getPersonaId());
     return new ChatResponseDto(user.getApiKey(), user.getPersonaId());
+  }
+
+  /**
+   * Proxies create-chat-session to Onyx API. Uses user.apiKey as Bearer auth.
+   * Passes request and response through unchanged.
+   */
+  public Map<String, Object> createChatSession(User user, @NotNull Map<String, Object> request) {
+    if (user.getApiKey() == null || user.getApiKey().isBlank()) {
+      throw new BadRequestException("No API key. Call GET /chat first to obtain chat credentials.");
+    }
+    return onyxClient.createChatSession(user.getApiKey(), request);
   }
 }
