@@ -1,0 +1,3 @@
+ALTER TABLE users
+  ADD COLUMN api_key VARCHAR(512) NULL,
+  ADD COLUMN persona_id INTEGER NULL;
