@@ -16,14 +16,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.web.multipart.MultipartFile;
-import reactor.core.publisher.Flux;
+import org.springframework.web.client.RequestCallback;
+import org.springframework.web.client.ResponseExtractor;
 import ru.cleardocs.backend.dto.EntityConnectorDto;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.exception.NotFoundException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.util.StreamUtils;
+
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -49,7 +54,7 @@ public class OnyxClient {
   private static final String PATH_CHAT_SEND_MESSAGE = "/chat/send-chat-message";
 
   private final RestTemplate restTemplate;
-  private final org.springframework.web.reactive.function.client.WebClient webClient;
+  private final ObjectMapper objectMapper;
   private final String baseUrl;
   private final String managePath;
   private final String apiKey;
@@ -59,10 +64,10 @@ public class OnyxClient {
       @Value("${onyx.manage-path:/manage}") String managePath,
       @Value("${onyx.api-key:}") String apiKey,
       @Autowired RestTemplate restTemplate,
-      @Autowired org.springframework.web.reactive.function.client.WebClient webClient
+      @Autowired ObjectMapper objectMapper
   ) {
     this.restTemplate = restTemplate;
-    this.webClient = webClient;
+    this.objectMapper = objectMapper;
     this.baseUrl = baseUrl.replaceAll("/$", "");
     this.managePath = managePath.replaceAll("/$", "");
     this.apiKey = apiKey;
@@ -482,20 +487,24 @@ public class OnyxClient {
   }
 
   /**
-   * Proxies send-chat-message to Onyx API. Forwards Authorization header and body as-is.
-   * Returns SSE stream (text/event-stream).
+   * Proxies send-chat-message to Onyx API. Streams response directly to outputStream (InputStream pipe).
    */
-  public Flux<DataBuffer> sendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request) {
+  public void streamSendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request, OutputStream outputStream) throws IOException {
     String requestUrl = urlApi(PATH_CHAT_SEND_MESSAGE);
-    var bodySpec = webClient.post()
-        .uri(requestUrl)
-        .contentType(MediaType.APPLICATION_JSON)
-        .bodyValue(request);
-    var withHeaders = authorizationHeader != null && !authorizationHeader.isBlank()
-        ? bodySpec.header("Authorization", authorizationHeader)
-        : bodySpec;
-    return withHeaders.retrieve()
-        .bodyToFlux(DataBuffer.class);
+    RequestCallback requestCallback = req -> {
+      req.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+      if (authorizationHeader != null && !authorizationHeader.isBlank()) {
+        req.getHeaders().set("Authorization", authorizationHeader);
+      }
+      objectMapper.writeValue(req.getBody(), request);
+    };
+    ResponseExtractor<Void> responseExtractor = response -> {
+      try (InputStream in = response.getBody()) {
+        StreamUtils.copy(in, outputStream);
+      }
+      return null;
+    };
+    restTemplate.execute(requestUrl, org.springframework.http.HttpMethod.POST, requestCallback, responseExtractor);
   }
 
   /**
