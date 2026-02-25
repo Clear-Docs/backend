@@ -30,8 +30,16 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
     this.userService = userService;
   }
 
+  private static final String PATH_CHAT_CREATE_SESSION = "/api/v1/chat/create-chat-session";
+  private static final String PATH_CHAT_SEND_MESSAGE = "/api/v1/chat/send-chat-message";
+
   @Override
   protected void doFilterInternal(HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) throws ServletException, IOException {
+    String path = request.getRequestURI();
+    if (PATH_CHAT_CREATE_SESSION.equals(path) || PATH_CHAT_SEND_MESSAGE.equals(path)) {
+      filterChain.doFilter(request, response);
+      return;
+    }
     String header = request.getHeader("Authorization");
     if (header != null && header.startsWith("Bearer ")) {
       String token = header.substring(7);
