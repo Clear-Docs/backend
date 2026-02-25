@@ -32,6 +32,12 @@ public class User {
   @Column(name = "doc_set_id")
   private Integer docSetId;
 
+  @Column(name = "api_key")
+  private String apiKey;
+
+  @Column(name = "persona_id")
+  private Integer personaId;
+
   @PrePersist
   public void prePersist() {
     this.createdAt = LocalDateTime.now();

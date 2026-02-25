@@ -40,6 +40,8 @@ public class OnyxClient {
   private static final String PATH_ADMIN_INDEXING_STATUS = "/admin/connector/indexing-status";
   private static final String PATH_ADMIN_DELETION_ATTEMPT = "/admin/deletion-attempt";
   private static final String PATH_ADMIN_CC_PAIR = "/admin/cc-pair";
+  private static final String PATH_ADMIN_API_KEY = "/admin/api-key";
+  private static final String PATH_PERSONA = "/persona";
 
   private final RestTemplate restTemplate;
   private final String baseUrl;
@@ -60,6 +62,11 @@ public class OnyxClient {
 
   private String url(String path) {
     return baseUrl + managePath + path;
+  }
+
+  /** URL for API paths not under /manage (e.g. /persona). */
+  private String urlApi(String path) {
+    return baseUrl + path;
   }
 
   /**
@@ -386,6 +393,63 @@ public class OnyxClient {
   /** Resumes (activates) a connector in Onyx. */
   public void resumeConnector(int ccPairId) {
     updateConnectorStatus(ccPairId, "ACTIVE");
+  }
+
+  /**
+   * Creates a limited API key in Onyx for the user.
+   * Calls POST /manage/admin/api-key (verify in your Onyx Swagger: http://155.212.162.11:3000/api/docs).
+   * If the endpoint does not exist, create API keys manually in Onyx Admin Panel.
+   */
+  public String createApiKey(String name, String role) {
+    String requestUrl = urlApi(PATH_ADMIN_API_KEY);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    OnyxApiKeyCreateRequestDto request = new OnyxApiKeyCreateRequestDto(
+        name != null ? name : "Chat Key",
+        role != null ? role : "limited"
+    );
+    HttpEntity<OnyxApiKeyCreateRequestDto> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<OnyxApiKeyCreateResponseDto> response = restTemplate.exchange(
+        requestUrl,
+        HttpMethod.POST,
+        entity,
+        OnyxApiKeyCreateResponseDto.class
+    );
+    OnyxApiKeyCreateResponseDto body = response.getBody();
+    if (body == null || body.getKeyValue() == null || body.getKeyValue().isBlank()) {
+      throw new RuntimeException("Onyx create API key returned empty key");
+    }
+    return body.getKeyValue();
+  }
+
+  /**
+   * Creates a persona (agent) in Onyx with the given document set attached.
+   * Onyx API: POST /persona (PersonaUpsertRequest).
+   * Returns the persona_id.
+   */
+  public int createPersonaWithDocumentSet(String name, int docSetId) {
+    String requestUrl = urlApi(PATH_PERSONA);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+    OnyxPersonaUpsertRequestDto request = OnyxPersonaUpsertRequestDto.forDocumentSet(name, docSetId);
+    HttpEntity<OnyxPersonaUpsertRequestDto> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<OnyxPersonaSnapshotDto> response = restTemplate.exchange(
+        requestUrl,
+        HttpMethod.POST,
+        entity,
+        OnyxPersonaSnapshotDto.class
+    );
+    OnyxPersonaSnapshotDto body = response.getBody();
+    if (body == null || body.id() == null) {
+      throw new RuntimeException("Onyx create persona returned empty id");
+    }
+    return body.id();
   }
 
   /**
