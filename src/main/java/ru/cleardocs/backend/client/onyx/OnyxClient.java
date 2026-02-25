@@ -491,6 +491,10 @@ public class OnyxClient {
    */
   public void streamSendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request, OutputStream outputStream) throws IOException {
     String requestUrl = urlApi(PATH_CHAT_SEND_MESSAGE);
+    Object message = request.get("message");
+    Object chatSessionId = request.get("chat_session_id");
+    long startTime = System.currentTimeMillis();
+    log.info("streamSendChatMessage() - start POST {} message={} chat_session_id={}", requestUrl, message != null ? message : "(null)", chatSessionId);
     RequestCallback requestCallback = req -> {
       req.getHeaders().setContentType(MediaType.APPLICATION_JSON);
       if (authorizationHeader != null && !authorizationHeader.isBlank()) {
@@ -499,12 +503,32 @@ public class OnyxClient {
       objectMapper.writeValue(req.getBody(), request);
     };
     ResponseExtractor<Void> responseExtractor = response -> {
+      int status = response.getStatusCode().value();
+      var contentType = response.getHeaders().getContentType();
+      log.info("streamSendChatMessage() - Onyx responded status={} content-type={}, starting stream copy",
+          status, contentType);
       try (InputStream in = response.getBody()) {
-        StreamUtils.copy(in, outputStream);
+        if (in == null) {
+          log.error("streamSendChatMessage() - response body is null");
+          throw new IOException("Onyx response body is null");
+        }
+        long bytesCopied = StreamUtils.copy(in, outputStream);
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.info("streamSendChatMessage() - stream copy complete, bytes={} elapsedMs={}", bytesCopied, elapsed);
+      } catch (IOException e) {
+        long elapsed = System.currentTimeMillis() - startTime;
+        log.error("streamSendChatMessage() - stream copy failed after {}ms: {} (possible client disconnect)", elapsed, e.getMessage());
+        throw e;
       }
       return null;
     };
-    restTemplate.execute(requestUrl, org.springframework.http.HttpMethod.POST, requestCallback, responseExtractor);
+    try {
+      restTemplate.execute(requestUrl, org.springframework.http.HttpMethod.POST, requestCallback, responseExtractor);
+    } catch (Exception e) {
+      long elapsed = System.currentTimeMillis() - startTime;
+      log.error("streamSendChatMessage() - Onyx request failed after {}ms: {}", elapsed, e.getMessage());
+      throw e;
+    }
   }
 
   /**
