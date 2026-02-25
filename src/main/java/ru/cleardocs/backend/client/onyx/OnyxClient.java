@@ -1,5 +1,6 @@
 package ru.cleardocs.backend.client.onyx;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +16,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.web.multipart.MultipartFile;
+import reactor.core.publisher.Flux;
 import ru.cleardocs.backend.dto.EntityConnectorDto;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.exception.NotFoundException;
@@ -42,8 +45,11 @@ public class OnyxClient {
   private static final String PATH_ADMIN_CC_PAIR = "/admin/cc-pair";
   private static final String PATH_ADMIN_API_KEY = "/admin/api-key";
   private static final String PATH_PERSONA = "/persona";
+  private static final String PATH_CHAT_CREATE_SESSION = "/chat/create-chat-session";
+  private static final String PATH_CHAT_SEND_MESSAGE = "/chat/send-chat-message";
 
   private final RestTemplate restTemplate;
+  private final org.springframework.web.reactive.function.client.WebClient webClient;
   private final String baseUrl;
   private final String managePath;
   private final String apiKey;
@@ -52,9 +58,11 @@ public class OnyxClient {
       @Value("${onyx.base-url:http://155.212.162.11:3000/api}") String baseUrl,
       @Value("${onyx.manage-path:/manage}") String managePath,
       @Value("${onyx.api-key:}") String apiKey,
-      @Autowired RestTemplate restTemplate
+      @Autowired RestTemplate restTemplate,
+      @Autowired org.springframework.web.reactive.function.client.WebClient webClient
   ) {
     this.restTemplate = restTemplate;
+    this.webClient = webClient;
     this.baseUrl = baseUrl.replaceAll("/$", "");
     this.managePath = managePath.replaceAll("/$", "");
     this.apiKey = apiKey;
@@ -450,6 +458,44 @@ public class OnyxClient {
       throw new RuntimeException("Onyx create persona returned empty id");
     }
     return body.id();
+  }
+
+  /**
+   * Creates a chat session in Onyx. Proxies POST /chat/create-chat-session.
+   * Forwards the Authorization header from the incoming request as-is.
+   */
+  public Map<String, Object> createChatSession(String authorizationHeader, @NotNull Map<String, Object> request) {
+    String requestUrl = urlApi(PATH_CHAT_CREATE_SESSION);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (authorizationHeader != null && !authorizationHeader.isBlank()) {
+      headers.set("Authorization", authorizationHeader);
+    }
+    HttpEntity<Map<String, Object>> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+        requestUrl,
+        HttpMethod.POST,
+        entity,
+        new ParameterizedTypeReference<Map<String, Object>>() {}
+    );
+    return response.getBody();
+  }
+
+  /**
+   * Proxies send-chat-message to Onyx API. Forwards Authorization header and body as-is.
+   * Returns SSE stream (text/event-stream).
+   */
+  public Flux<DataBuffer> sendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request) {
+    String requestUrl = urlApi(PATH_CHAT_SEND_MESSAGE);
+    var bodySpec = webClient.post()
+        .uri(requestUrl)
+        .contentType(MediaType.APPLICATION_JSON)
+        .bodyValue(request);
+    var withHeaders = authorizationHeader != null && !authorizationHeader.isBlank()
+        ? bodySpec.header("Authorization", authorizationHeader)
+        : bodySpec;
+    return withHeaders.retrieve()
+        .bodyToFlux(DataBuffer.class);
   }
 
   /**

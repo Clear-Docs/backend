@@ -1,5 +1,6 @@
 package ru.cleardocs.backend.service;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,7 +11,11 @@ import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.repository.UserRepository;
 
+import org.springframework.core.io.buffer.DataBuffer;
+import reactor.core.publisher.Flux;
+
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -59,5 +64,21 @@ public class ChatService {
 
     log.info("getChatCredentials() - ends with apiKey set, personaId = {}", user.getPersonaId());
     return new ChatResponseDto(user.getApiKey(), user.getPersonaId());
+  }
+
+  /**
+   * Proxies create-chat-session to Onyx API. Forward the Authorization header as-is.
+   * Client sends user's Onyx API key in Authorization header.
+   */
+  public Map<String, Object> createChatSession(String authorizationHeader, @NotNull Map<String, Object> request) {
+    return onyxClient.createChatSession(authorizationHeader, request);
+  }
+
+  /**
+   * Proxies send-chat-message to Onyx API. Forwards Authorization header and body as-is.
+   * Returns SSE stream.
+   */
+  public Flux<DataBuffer> sendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request) {
+    return onyxClient.sendChatMessage(authorizationHeader, request);
   }
 }
