@@ -11,6 +11,9 @@ import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.repository.UserRepository;
 
+import org.springframework.core.io.buffer.DataBuffer;
+import reactor.core.publisher.Flux;
+
 import java.util.List;
 import java.util.Map;
 
@@ -64,13 +67,18 @@ public class ChatService {
   }
 
   /**
-   * Proxies create-chat-session to Onyx API. Uses user.apiKey as Bearer auth.
-   * Passes request and response through unchanged.
+   * Proxies create-chat-session to Onyx API. Forward the Authorization header as-is.
+   * Client sends user's Onyx API key in Authorization header.
    */
-  public Map<String, Object> createChatSession(User user, @NotNull Map<String, Object> request) {
-    if (user.getApiKey() == null || user.getApiKey().isBlank()) {
-      throw new BadRequestException("No API key. Call GET /chat first to obtain chat credentials.");
-    }
-    return onyxClient.createChatSession(user.getApiKey(), request);
+  public Map<String, Object> createChatSession(String authorizationHeader, @NotNull Map<String, Object> request) {
+    return onyxClient.createChatSession(authorizationHeader, request);
+  }
+
+  /**
+   * Proxies send-chat-message to Onyx API. Forwards Authorization header and body as-is.
+   * Returns SSE stream.
+   */
+  public Flux<DataBuffer> sendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request) {
+    return onyxClient.sendChatMessage(authorizationHeader, request);
   }
 }

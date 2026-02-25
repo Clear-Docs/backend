@@ -1,6 +1,9 @@
 package ru.cleardocs.backend.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.cleardocs.backend.dto.ChatResponseDto;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.service.ChatService;
+import reactor.core.publisher.Flux;
 
 import java.util.Map;
 
@@ -33,11 +37,17 @@ public class ChatController {
   }
 
   @PostMapping("/chat/create-chat-session")
-  public ResponseEntity<?> createChatSession(
-      @AuthenticationPrincipal User user,
-      @RequestBody Map<String, Object> body) {
-    log.info("createChatSession() - starts with user id = {}", user.getId());
-    Object response = chatService.createChatSession(user, body);
+  public ResponseEntity<?> createChatSession(HttpServletRequest request, @RequestBody Map<String, Object> body) {
+    log.info("createChatSession() - proxying to Onyx");
+    Object response = chatService.createChatSession(
+        request.getHeader("Authorization"),
+        body);
     return ResponseEntity.ok(response);
+  }
+
+  @PostMapping(value = "/chat/send-chat-message", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  public Flux<DataBuffer> sendChatMessage(HttpServletRequest request, @RequestBody Map<String, Object> body) {
+    log.info("sendChatMessage() - proxying to Onyx");
+    return chatService.sendChatMessage(request.getHeader("Authorization"), body);
   }
 }

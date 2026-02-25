@@ -33,6 +33,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             .requestMatchers("/api/v1/plans").permitAll()
+            .requestMatchers("/api/v1/chat/create-chat-session", "/api/v1/chat/send-chat-message").permitAll()
             .anyRequest().authenticated()
         )
         .addFilterBefore(firebaseTokenFilter, UsernamePasswordAuthenticationFilter.class)
