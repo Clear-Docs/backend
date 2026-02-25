@@ -11,9 +11,8 @@ import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.repository.UserRepository;
 
-import org.springframework.core.io.buffer.DataBuffer;
-import reactor.core.publisher.Flux;
-
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 
@@ -75,10 +74,9 @@ public class ChatService {
   }
 
   /**
-   * Proxies send-chat-message to Onyx API. Forwards Authorization header and body as-is.
-   * Returns SSE stream.
+   * Proxies send-chat-message to Onyx API. Streams response directly to outputStream.
    */
-  public Flux<DataBuffer> sendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request) {
-    return onyxClient.sendChatMessage(authorizationHeader, request);
+  public void streamSendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request, OutputStream outputStream) throws IOException {
+    onyxClient.streamSendChatMessage(authorizationHeader, request, outputStream);
   }
 }
