@@ -47,12 +47,21 @@ public class ChatController {
 
   @PostMapping(value = "/chat/send-chat-message", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
   public ResponseEntity<StreamingResponseBody> sendChatMessage(HttpServletRequest request, @RequestBody Map<String, Object> body) {
-    log.info("sendChatMessage() - proxying to Onyx");
-    StreamingResponseBody streamBody = outputStream -> chatService.streamSendChatMessage(
-        request.getHeader("Authorization"),
-        body,
-        outputStream
-    );
+    Object msg = body != null ? body.get("message") : null;
+    Object sessionId = body != null ? body.get("chat_session_id") : null;
+    log.info("sendChatMessage() - request received message={} chat_session_id={}", msg, sessionId);
+    StreamingResponseBody streamBody = outputStream -> {
+      long start = System.currentTimeMillis();
+      log.info("sendChatMessage() - StreamingResponseBody.writeTo started");
+      try {
+        chatService.streamSendChatMessage(request.getHeader("Authorization"), body, outputStream);
+        outputStream.flush();
+        log.info("sendChatMessage() - StreamingResponseBody.writeTo completed in {}ms", System.currentTimeMillis() - start);
+      } catch (Exception e) {
+        log.error("sendChatMessage() - stream error after {}ms: {} (client may have disconnected)", System.currentTimeMillis() - start, e.getMessage());
+        throw e;
+      }
+    };
     return ResponseEntity.ok()
         .contentType(MediaType.TEXT_EVENT_STREAM)
         .body(streamBody);
