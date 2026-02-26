@@ -77,15 +77,16 @@ public class ChatService {
    * Proxies send-chat-message to Onyx API. Streams response directly to outputStream.
    */
   public void streamSendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request, OutputStream outputStream) throws IOException {
-    Object msg = request != null ? request.get("message") : null;
     Object sessionId = request != null ? request.get("chat_session_id") : null;
     long start = System.currentTimeMillis();
-    log.info("streamSendChatMessage() - start message={} chat_session_id={}", msg, sessionId);
+    log.debug("streamSendChatMessage sessionId={} start", sessionId);
     try {
       onyxClient.streamSendChatMessage(authorizationHeader, request, outputStream);
-      log.info("streamSendChatMessage() - completed in {}ms", System.currentTimeMillis() - start);
+      long elapsed = System.currentTimeMillis() - start;
+      log.debug("streamSendChatMessage sessionId={} done elapsed_ms={}", sessionId, elapsed);
     } catch (IOException e) {
-      log.error("streamSendChatMessage() - failed after {}ms: {}", System.currentTimeMillis() - start, e.getMessage());
+      long elapsed = System.currentTimeMillis() - start;
+      log.error("streamSendChatMessage sessionId={} failed elapsed_ms={} error={}", sessionId, elapsed, e.getMessage());
       throw e;
     }
   }

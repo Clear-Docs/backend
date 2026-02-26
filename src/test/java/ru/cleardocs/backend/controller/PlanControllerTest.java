@@ -39,7 +39,7 @@ class PlanControllerTest {
   void getAll_returnsPlans() throws Exception {
     var plans = new GetAllPlansDto(List.of(
         new PlanDto(PlanCode.FREE, "Бесплатный", 0, 30, new LimitDto(1)),
-        new PlanDto(PlanCode.MONTH, "Подписка на месяц", 990, 30, new LimitDto(10))
+        new PlanDto(PlanCode.MONTH, "Подписка на месяц", 990, 30, new LimitDto(100))
     ));
     when(planService.getAll()).thenReturn(plans);
 

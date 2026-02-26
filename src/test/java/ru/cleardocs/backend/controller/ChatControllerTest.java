@@ -35,6 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ChatControllerTest {
 
   private static final String SSE_PAYLOAD = "data: {\"type\":\"message_delta\",\"delta\":\"Hello\"}\n\n";
+  private static final String SSE_PAYLOAD_WITH_END = "data: {\"type\":\"message_delta\",\"delta\":\"Hello\"}\n\n"
+      + "data: {\"type\":\"message_delta\",\"delta\":\" world\"}\n\n"
+      + "data: {\"type\":\"message_end\"}\n\n";
 
   @Autowired
   MockMvc mockMvc;
@@ -74,6 +77,29 @@ class ChatControllerTest {
     mockServer.verify();
   }
 
+  @Test
+  void sendChatMessage_deliversFullStreamIncludingEnd() throws Exception {
+    mockServer.expect(requestTo(containsString("send-chat-message")))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess(SSE_PAYLOAD_WITH_END, MediaType.TEXT_EVENT_STREAM));
+
+    var mvcResult = mockMvc.perform(post("/api/v1/chat/send-chat-message")
+            .contentType(MediaType.APPLICATION_JSON)
+            .header("Authorization", "Bearer onyx-api-key")
+            .content("{\"message\":\"hi\",\"chat_session_id\":\"sess-123\"}"))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(mvcResult))
+        .andExpect(status().isOk())
+        .andExpect(content().contentType(MediaType.TEXT_EVENT_STREAM))
+        .andExpect(content().string(containsString("\"delta\":\"Hello\"")))
+        .andExpect(content().string(containsString("\"delta\":\" world\"")))
+        .andExpect(content().string(containsString("\"type\":\"message_end\"")));
+
+    mockServer.verify();
+  }
+
   @TestConfiguration
   static class TestConfig {
 
@@ -81,6 +107,11 @@ class ChatControllerTest {
     @Primary
     RestTemplate restTemplate() {
       return new RestTemplate();
+    }
+
+    @Bean("onyxStreamingRestTemplate")
+    RestTemplate onyxStreamingRestTemplate(RestTemplate restTemplate) {
+      return restTemplate;  // same instance — MockRestServiceServer intercepts send-chat-message
     }
   }
 }
