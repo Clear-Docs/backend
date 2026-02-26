@@ -3,6 +3,7 @@ package ru.cleardocs.backend.client.onyx;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
@@ -24,7 +25,6 @@ import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.exception.NotFoundException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.util.StreamUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,6 +54,7 @@ public class OnyxClient {
   private static final String PATH_CHAT_SEND_MESSAGE = "/chat/send-chat-message";
 
   private final RestTemplate restTemplate;
+  private final RestTemplate onyxStreamingRestTemplate;
   private final ObjectMapper objectMapper;
   private final String baseUrl;
   private final String managePath;
@@ -64,9 +65,11 @@ public class OnyxClient {
       @Value("${onyx.manage-path:/manage}") String managePath,
       @Value("${onyx.api-key:}") String apiKey,
       @Autowired RestTemplate restTemplate,
+      @Autowired @Qualifier("onyxStreamingRestTemplate") RestTemplate onyxStreamingRestTemplate,
       @Autowired ObjectMapper objectMapper
   ) {
     this.restTemplate = restTemplate;
+    this.onyxStreamingRestTemplate = onyxStreamingRestTemplate;
     this.objectMapper = objectMapper;
     this.baseUrl = baseUrl.replaceAll("/$", "");
     this.managePath = managePath.replaceAll("/$", "");
@@ -488,13 +491,18 @@ public class OnyxClient {
 
   /**
    * Proxies send-chat-message to Onyx API. Streams response directly to outputStream (InputStream pipe).
+   * Flushes after each chunk to ensure end of stream reaches client (avoids truncation).
    */
   public void streamSendChatMessage(String authorizationHeader, @NotNull Map<String, Object> request, OutputStream outputStream) throws IOException {
     String requestUrl = urlApi(PATH_CHAT_SEND_MESSAGE);
     Object message = request.get("message");
     Object chatSessionId = request.get("chat_session_id");
+    String msgPreview = message != null ? message.toString() : "";
+    if (msgPreview.length() > 80) {
+      msgPreview = msgPreview.substring(0, 80) + "...";
+    }
     long startTime = System.currentTimeMillis();
-    log.info("streamSendChatMessage() - start POST {} message={} chat_session_id={}", requestUrl, message != null ? message : "(null)", chatSessionId);
+    log.info("sendChatMessage Onyx start sessionId={} messagePreview={} url={}", chatSessionId, msgPreview, requestUrl);
     RequestCallback requestCallback = req -> {
       req.getHeaders().setContentType(MediaType.APPLICATION_JSON);
       if (authorizationHeader != null && !authorizationHeader.isBlank()) {
@@ -505,28 +513,40 @@ public class OnyxClient {
     ResponseExtractor<Void> responseExtractor = response -> {
       int status = response.getStatusCode().value();
       var contentType = response.getHeaders().getContentType();
-      log.info("streamSendChatMessage() - Onyx responded status={} content-type={}, starting stream copy",
-          status, contentType);
+      log.debug("sendChatMessage Onyx response sessionId={} status={} contentType={}", chatSessionId, status, contentType);
       try (InputStream in = response.getBody()) {
         if (in == null) {
-          log.error("streamSendChatMessage() - response body is null");
+          log.error("sendChatMessage Onyx error sessionId={} error=response body is null", chatSessionId);
           throw new IOException("Onyx response body is null");
         }
-        long bytesCopied = StreamUtils.copy(in, outputStream);
+        byte[] buffer = new byte[4096];
+        int n;
+        long totalBytes = 0;
+        int chunkCount = 0;
+        while ((n = in.read(buffer)) != -1) {
+          outputStream.write(buffer, 0, n);
+          outputStream.flush();  // Flush each chunk — ensures end of phrase reaches client
+          totalBytes += n;
+          chunkCount++;
+          if (chunkCount > 0 && chunkCount % 50 == 0) {
+            log.debug("sendChatMessage streaming sessionId={} chunks={} bytes={}", chatSessionId, chunkCount, totalBytes);
+          }
+        }
         long elapsed = System.currentTimeMillis() - startTime;
-        log.info("streamSendChatMessage() - stream copy complete, bytes={} elapsedMs={}", bytesCopied, elapsed);
+        log.info("sendChatMessage Onyx done sessionId={} bytes={} chunks={} elapsed_ms={}", chatSessionId, totalBytes, chunkCount, elapsed);
       } catch (IOException e) {
         long elapsed = System.currentTimeMillis() - startTime;
-        log.error("streamSendChatMessage() - stream copy failed after {}ms: {} (possible client disconnect)", elapsed, e.getMessage());
+        log.error("sendChatMessage Onyx error sessionId={} elapsed_ms={} error={} (possible client disconnect)",
+            chatSessionId, elapsed, e.getMessage());
         throw e;
       }
       return null;
     };
     try {
-      restTemplate.execute(requestUrl, org.springframework.http.HttpMethod.POST, requestCallback, responseExtractor);
+      onyxStreamingRestTemplate.execute(requestUrl, org.springframework.http.HttpMethod.POST, requestCallback, responseExtractor);
     } catch (Exception e) {
       long elapsed = System.currentTimeMillis() - startTime;
-      log.error("streamSendChatMessage() - Onyx request failed after {}ms: {}", elapsed, e.getMessage());
+      log.error("sendChatMessage Onyx error sessionId={} elapsed_ms={} error={}", chatSessionId, elapsed, e.getMessage());
       throw e;
     }
   }

@@ -23,7 +23,7 @@ public class WithMockFirebaseUserSecurityContextFactory implements WithSecurityC
 
     Limit limit = Limit.builder()
         .id(UUID.randomUUID())
-        .maxConnectors(planCode == PlanCode.FREE ? 1 : 10)
+        .maxConnectors(planCode == PlanCode.FREE ? 1 : 100)
         .build();
 
     Plan plan = Plan.builder()

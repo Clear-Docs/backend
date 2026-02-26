@@ -49,18 +49,21 @@ public class ChatController {
   public ResponseEntity<StreamingResponseBody> sendChatMessage(HttpServletRequest request, @RequestBody Map<String, Object> body) {
     Object msg = body != null ? body.get("message") : null;
     Object sessionId = body != null ? body.get("chat_session_id") : null;
-    log.info("sendChatMessage() - request received message={} chat_session_id={}", msg, sessionId);
+    int messageLength = msg != null ? msg.toString().length() : 0;
+    log.info("sendChatMessage request sessionId={} messageLength={}", sessionId, messageLength);
     StreamingResponseBody streamBody = outputStream -> {
       long start = System.currentTimeMillis();
-      log.info("sendChatMessage() - StreamingResponseBody.writeTo started");
       try {
         chatService.streamSendChatMessage(request.getHeader("Authorization"), body, outputStream);
-        outputStream.flush();
-        log.info("sendChatMessage() - StreamingResponseBody.writeTo completed in {}ms", System.currentTimeMillis() - start);
       } catch (Exception e) {
-        log.error("sendChatMessage() - stream error after {}ms: {} (client may have disconnected)", System.currentTimeMillis() - start, e.getMessage());
+        long elapsed = System.currentTimeMillis() - start;
+        log.warn("sendChatMessage failed sessionId={} elapsed_ms={} error={}", sessionId, elapsed, e.getMessage());
         throw e;
+      } finally {
+        outputStream.flush();  // Always flush, even on exception — ensures last chunk reaches client
       }
+      long elapsed = System.currentTimeMillis() - start;
+      log.info("sendChatMessage completed sessionId={} elapsed_ms={}", sessionId, elapsed);
     };
     return ResponseEntity.ok()
         .contentType(MediaType.TEXT_EVENT_STREAM)

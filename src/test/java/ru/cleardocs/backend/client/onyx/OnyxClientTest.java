@@ -13,6 +13,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.ByteArrayOutputStream;
+import java.util.Map;
+
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,6 +57,28 @@ class OnyxClientTest {
     assertTrue(thrown.getMessage().contains("Onyx returned null cc_pair_status for cc_pair_id=123"));
   }
 
+  @Test
+  void streamSendChatMessage_writesFullStreamWithFlush() throws Exception {
+    String ssePayload = "data: {\"type\":\"message_delta\",\"delta\":\"Hello\"}\n\n"
+        + "data: {\"type\":\"message_delta\",\"delta\":\" world\"}\n\n"
+        + "data: {\"type\":\"message_end\"}\n\n";
+
+    mockServer.expect(requestTo(containsString("send-chat-message")))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withSuccess(ssePayload, MediaType.TEXT_EVENT_STREAM));
+
+    var out = new ByteArrayOutputStream();
+    var request = Map.<String, Object>of("message", "hi", "chat_session_id", "sess-1");
+    onyxClient.streamSendChatMessage("Bearer key", request, out);
+
+    String result = out.toString();
+    assertTrue(result.contains("\"delta\":\"Hello\""), "Should contain first delta");
+    assertTrue(result.contains("\"delta\":\" world\""), "Should contain second delta");
+    assertTrue(result.contains("\"type\":\"message_end\""), "Should contain end — full stream delivered");
+
+    mockServer.verify();
+  }
+
   @TestConfiguration
   static class TestConfig {
 
@@ -61,6 +86,11 @@ class OnyxClientTest {
     @Primary
     RestTemplate restTemplate() {
       return new RestTemplate();
+    }
+
+    @Bean("onyxStreamingRestTemplate")
+    RestTemplate onyxStreamingRestTemplate(RestTemplate restTemplate) {
+      return restTemplate;  // same instance — MockRestServiceServer intercepts streamSendChatMessage
     }
   }
 }
