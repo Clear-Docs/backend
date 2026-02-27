@@ -118,6 +118,54 @@ public class ConnectorService {
     return new CreateConnectorResponseDto(ccPairId, name, "file");
   }
 
+  @Transactional
+  public CreateConnectorResponseDto createUrlConnector(User user, String name, String url) {
+    log.info("createUrlConnector() - starts with user id = {}, docSetId = {}, name = {}, url = {}",
+        user.getId(), user.getDocSetId(), name, url);
+
+    if (name == null || name.isBlank()) {
+      throw new BadRequestException("Connector name is required.");
+    }
+
+    if (url == null || url.isBlank()) {
+      throw new BadRequestException("URL is required.");
+    }
+
+    int maxConnectors = 0;
+    Plan plan = user.getPlan();
+    if (plan != null && plan.getLimit() != null) {
+      maxConnectors = plan.getLimit().getMaxConnectors();
+    }
+
+    List<EntityConnectorDto> existingConnectors = user.getDocSetId() == null
+        ? Collections.emptyList()
+        : onyxClient.getConnectorsByDocSetId(user.getDocSetId());
+    if (existingConnectors.size() >= maxConnectors) {
+      log.warn("createUrlConnector() - connector limit reached for user id = {}, current = {}, max = {}",
+          user.getId(), existingConnectors.size(), maxConnectors);
+      throw new BadRequestException(String.format(
+          "Connector limit reached. Current: %d, Maximum allowed: %d",
+          existingConnectors.size(), maxConnectors));
+    }
+
+    OnyxCreateConnectorResponseDto createResponse = onyxClient.createUrlConnector(name, url);
+
+    if (!Boolean.TRUE.equals(createResponse.success()) || createResponse.data() == null) {
+      throw new RuntimeException("Failed to create URL connector in Onyx: " + createResponse.message());
+    }
+
+    int ccPairId = createResponse.data();
+
+    if (user.getDocSetId() == null) {
+      createAndLinkDocumentSet(user, ccPairId);
+    } else {
+      addConnectorToExistingDocumentSet(user, existingConnectors, ccPairId);
+    }
+
+    log.info("createUrlConnector() - ends with cc_pair_id = {}", ccPairId);
+    return new CreateConnectorResponseDto(ccPairId, name, "web");
+  }
+
   public void deleteConnector(User user, int connectorId) {
     log.info("deleteConnector() - starts with user id = {}, docSetId = {}, connectorId = {}",
         user.getId(), user.getDocSetId(), connectorId);

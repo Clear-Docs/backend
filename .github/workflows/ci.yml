@@ -49,7 +49,7 @@ jobs:
           cache: maven
 
       - name: Build JAR
-        run: mvn package -B -DskipTests
+        run: chmod +x mvnw && ./mvnw package -B -DskipTests
 
       - name: Login to ghcr.io
         uses: docker/login-action@v3
