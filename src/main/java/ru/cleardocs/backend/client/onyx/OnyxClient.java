@@ -438,7 +438,7 @@ public class OnyxClient {
   }
 
   /**
-   * Creates a limited API key in Onyx for the user.
+   * Creates an API key in Onyx for the user (role: limited, basic, admin, etc.).
    * Calls POST /manage/admin/api-key (verify in your Onyx Swagger: http://155.212.162.11:3000/api/docs).
    * If the endpoint does not exist, create API keys manually in Onyx Admin Panel.
    */
