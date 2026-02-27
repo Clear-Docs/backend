@@ -37,6 +37,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -172,6 +173,91 @@ class ConnectorControllerTest {
     User savedUser = captor.getValue();
     assertNotNull(savedUser.getDocSetId());
     assertEquals(123, savedUser.getDocSetId());
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void createUrlConnector_authenticatedUser_returns201() throws Exception {
+    when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of());
+    when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
+        new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
+    ));
+    when(onyxClient.createUrlConnector(eq("My Site"), eq("https://example.com")))
+        .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 123));
+
+    mockMvc.perform(post("/api/v1/connectors/url")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"My Site\",\"url\":\"https://example.com\"}")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").value(123))
+        .andExpect(jsonPath("$.name").value("My Site"))
+        .andExpect(jsonPath("$.type").value("web"));
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE")
+  void createUrlConnector_userWithoutDocSet_createsDocumentSetAndSavesToDb() throws Exception {
+    when(onyxClient.createUrlConnector(eq("My Site"), eq("https://example.com")))
+        .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 456));
+    when(onyxClient.createDocumentSet(eq("Documents"), eq(""), eq(List.of(456)))).thenReturn(123);
+
+    mockMvc.perform(post("/api/v1/connectors/url")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"My Site\",\"url\":\"https://example.com\"}")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").value(456))
+        .andExpect(jsonPath("$.name").value("My Site"))
+        .andExpect(jsonPath("$.type").value("web"));
+
+    var captor = org.mockito.ArgumentCaptor.forClass(User.class);
+    verify(userRepository).save(captor.capture());
+    User savedUser = captor.getValue();
+    assertNotNull(savedUser.getDocSetId());
+    assertEquals(123, savedUser.getDocSetId());
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void createUrlConnector_missingName_returns400() throws Exception {
+    mockMvc.perform(post("/api/v1/connectors/url")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"url\":\"https://example.com\"}")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void createUrlConnector_missingUrl_returns400() throws Exception {
+    mockMvc.perform(post("/api/v1/connectors/url")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"My Site\"}")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
+  void createUrlConnector_limitReached_returns400() throws Exception {
+    when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(
+        List.of(new EntityConnectorDto(1, "Connector 1", "file", "ACTIVE"))
+    );
+
+    mockMvc.perform(post("/api/v1/connectors/url")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"My Site\",\"url\":\"https://example.com\"}")
+            .with(securityContext(SecurityContextHolder.getContext())))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void createUrlConnector_unauthenticated_returns401() throws Exception {
+    mockMvc.perform(post("/api/v1/connectors/url")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"My Site\",\"url\":\"https://example.com\"}"))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

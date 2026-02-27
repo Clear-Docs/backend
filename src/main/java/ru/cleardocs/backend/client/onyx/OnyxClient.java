@@ -227,6 +227,32 @@ public class OnyxClient {
   }
 
   /**
+   * Creates a web URL connector with mock credential in Onyx. Always uses recursive crawling.
+   * Returns the CC pair ID (connector-credential pair ID).
+   */
+  public OnyxCreateConnectorResponseDto createUrlConnector(String name, String url) {
+    String requestUrl = url(PATH_ADMIN_CONNECTOR_CREATE);
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    if (apiKey != null && !apiKey.isBlank()) {
+      headers.setBearerAuth(apiKey);
+    }
+
+    OnyxConnectorCreateRequestDto request = OnyxConnectorCreateRequestDto.forWebConnector(name, url);
+    HttpEntity<OnyxConnectorCreateRequestDto> entity = new HttpEntity<>(request, headers);
+    ResponseEntity<OnyxCreateConnectorResponseDto> response = restTemplate.exchange(
+        requestUrl,
+        HttpMethod.POST,
+        entity,
+        OnyxCreateConnectorResponseDto.class
+    );
+    if (response.getBody() == null) {
+      throw new RuntimeException("Onyx create URL connector returned empty response");
+    }
+    return response.getBody();
+  }
+
+  /**
    * Deletes a connector in Onyx via deletion-attempt (same as Onyx UI).
    * Requires connector_id and credential_id from connector status.
    * EntityConnectorDto.id is cc_pair_id; we resolve to connector_id/credential_id.

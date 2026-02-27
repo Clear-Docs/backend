@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import ru.cleardocs.backend.dto.CreateConnectorResponseDto;
+import ru.cleardocs.backend.dto.CreateUrlConnectorRequestDto;
 import ru.cleardocs.backend.dto.GetConnectorsDto;
 import ru.cleardocs.backend.dto.UpdateConnectorRequestDto;
 import ru.cleardocs.backend.entity.User;
+import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.service.ConnectorService;
 
 import java.io.IOException;
@@ -38,6 +40,20 @@ public class ConnectorController {
     log.info("getConnectors() - starts with user id = {}", user.getId());
     GetConnectorsDto response = connectorService.getConnectors(user);
     return ResponseEntity.ok(response);
+  }
+
+  @PostMapping("/url")
+  public ResponseEntity<CreateConnectorResponseDto> createUrlConnector(
+      @AuthenticationPrincipal User user,
+      @RequestBody CreateUrlConnectorRequestDto body
+  ) {
+    log.info("createUrlConnector() - starts with user id = {}, name = {}, url = {}",
+        user.getId(), body != null ? body.name() : null, body != null ? body.url() : null);
+    if (body == null || body.name() == null || body.url() == null) {
+      throw new BadRequestException("name and url are required");
+    }
+    CreateConnectorResponseDto response = connectorService.createUrlConnector(user, body.name(), body.url());
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
   @PostMapping
