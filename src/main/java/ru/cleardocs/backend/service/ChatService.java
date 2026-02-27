@@ -20,7 +20,7 @@ import java.util.Map;
 @Service
 public class ChatService {
 
-  private static final String API_KEY_TYPE_LIMITED = "limited";
+  private static final String API_KEY_TYPE_BASIC = "basic";
 
   private final OnyxClient onyxClient;
   private final UserRepository userRepository;
@@ -46,7 +46,7 @@ public class ChatService {
     // 2. Create API key if missing
     if (user.getApiKey() == null || user.getApiKey().isBlank()) {
       String keyName = "clear-docs-" + (user.getEmail() != null ? user.getEmail().replaceAll("[^a-zA-Z0-9]", "-") : user.getId().toString());
-      String newApiKey = onyxClient.createApiKey(keyName, API_KEY_TYPE_LIMITED);
+      String newApiKey = onyxClient.createApiKey(keyName, API_KEY_TYPE_BASIC);
       user.setApiKey(newApiKey);
       userRepository.save(user);
       log.info("getChatCredentials() - created API key for user id = {}", user.getId());
