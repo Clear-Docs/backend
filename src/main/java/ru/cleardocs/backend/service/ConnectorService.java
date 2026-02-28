@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -101,7 +102,11 @@ public class ConnectorService {
       throw new BadRequestException("No valid files were uploaded.");
     }
 
-    OnyxCreateConnectorResponseDto createResponse = onyxClient.createFileConnector(name, fileLocations, fileNames);
+    Set<String> existingNames = onyxClient.getAllConnectorNames();
+    String uniqueName = DocumentSetNameUtils.ensureUniqueName(
+        name, existingNames, user.getId() != null ? user.getId().toString().substring(0, 8) : "user");
+
+    OnyxCreateConnectorResponseDto createResponse = onyxClient.createFileConnector(uniqueName, fileLocations, fileNames);
 
     if (!Boolean.TRUE.equals(createResponse.success()) || createResponse.data() == null) {
       throw new RuntimeException("Failed to create connector in Onyx: " + createResponse.message());
@@ -116,7 +121,7 @@ public class ConnectorService {
     }
 
     log.info("createFileConnector() - ends with cc_pair_id = {}", ccPairId);
-    return new CreateConnectorResponseDto(ccPairId, name, "file");
+    return new CreateConnectorResponseDto(ccPairId, uniqueName, "file");
   }
 
   @Transactional
@@ -149,7 +154,11 @@ public class ConnectorService {
           existingConnectors.size(), maxConnectors));
     }
 
-    OnyxCreateConnectorResponseDto createResponse = onyxClient.createUrlConnector(name, url);
+    Set<String> existingNames = onyxClient.getAllConnectorNames();
+    String uniqueName = DocumentSetNameUtils.ensureUniqueName(
+        name, existingNames, user.getId() != null ? user.getId().toString().substring(0, 8) : "user");
+
+    OnyxCreateConnectorResponseDto createResponse = onyxClient.createUrlConnector(uniqueName, url);
 
     if (!Boolean.TRUE.equals(createResponse.success()) || createResponse.data() == null) {
       throw new RuntimeException("Failed to create URL connector in Onyx: " + createResponse.message());
@@ -164,7 +173,7 @@ public class ConnectorService {
     }
 
     log.info("createUrlConnector() - ends with cc_pair_id = {}", ccPairId);
-    return new CreateConnectorResponseDto(ccPairId, name, "web");
+    return new CreateConnectorResponseDto(ccPairId, uniqueName, "web");
   }
 
   public void deleteConnector(User user, int connectorId) {

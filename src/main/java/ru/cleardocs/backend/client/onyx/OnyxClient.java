@@ -35,6 +35,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Component
@@ -107,6 +110,25 @@ public class OnyxClient {
     } catch (Exception e) {
       log.warn("Failed to fetch connectors from Onyx for docSetId={}: {}", docSetId, e.getMessage());
       return List.of();
+    }
+  }
+
+  /**
+   * Returns all connector names from all document sets in Onyx (global uniqueness check).
+   */
+  public Set<String> getAllConnectorNames() {
+    try {
+      List<OnyxDocumentSetDto> docSets = fetchAllDocumentSets();
+      return docSets.stream()
+          .flatMap(ds -> Stream.concat(
+              ds.ccPairSummaries().stream(),
+              ds.federatedConnectorSummaries().stream()))
+          .map(OnyxConnectorSummaryDto::name)
+          .filter(n -> n != null && !n.isBlank())
+          .collect(Collectors.toSet());
+    } catch (Exception e) {
+      log.warn("Failed to fetch all connector names from Onyx: {}", e.getMessage());
+      return Set.of();
     }
   }
 

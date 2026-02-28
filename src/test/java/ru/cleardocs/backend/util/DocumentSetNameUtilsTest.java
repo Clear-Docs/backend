@@ -3,6 +3,8 @@ package ru.cleardocs.backend.util;
 import org.junit.jupiter.api.Test;
 import ru.cleardocs.backend.entity.User;
 
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -134,6 +136,48 @@ class DocumentSetNameUtilsTest {
     String result = DocumentSetNameUtils.documentSetNameFor("Docs", user);
 
     assertEquals("Docs (test@mail.ru) - 19e576e3", result);
+  }
+
+  @Test
+  void ensureUniqueName_nameNotExists_returnsAsIs() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "My Connector",
+        Set.of("Other Connector", "Another"),
+        "19e576e3");
+    assertEquals("My Connector", result);
+  }
+
+  @Test
+  void ensureUniqueName_nameExists_addsSuffix() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "My Connector",
+        Set.of("My Connector", "Other"),
+        "19e576e3");
+    assertEquals("My Connector - 19e576e3", result);
+  }
+
+  @Test
+  void ensureUniqueName_nameAndSuffixedExist_addsNumericPostfix() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "My Connector",
+        Set.of("My Connector", "My Connector - 19e576e3", "My Connector - 19e576e3-2"),
+        "19e576e3");
+    assertEquals("My Connector - 19e576e3-3", result);
+  }
+
+  @Test
+  void ensureUniqueName_emptyExistingNames_returnsAsIs() {
+    String result = DocumentSetNameUtils.ensureUniqueName("Test", Set.of(), "abc12");
+    assertEquals("Test", result);
+  }
+
+  @Test
+  void ensureUniqueName_existingNamesAsList_works() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "Dup",
+        List.of("Dup", "Foo"),
+        "xyz");
+    assertEquals("Dup - xyz", result);
   }
 
   @Test
