@@ -18,19 +18,19 @@ import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.exception.NotFoundException;
 import ru.cleardocs.backend.repository.UserRepository;
+import ru.cleardocs.backend.util.DocumentSetNameUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class ConnectorService {
 
-  private static final String DEFAULT_DOCUMENT_SET_NAME = "Docs";
+  private static final String DEFAULT_DOCUMENT_SET_NAME = "Documents";
 
   private final OnyxClient onyxClient;
   private final UserRepository userRepository;
@@ -216,24 +216,8 @@ public class ConnectorService {
     }
   }
 
-  private String documentSetNameFor(User user) {
-    String email = (user.getEmail() != null && !user.getEmail().isBlank())
-        ? user.getEmail()
-        : "user";
-    String suffix = user.getId() != null
-        ? user.getId().toString().substring(0, 8)
-        : UUID.randomUUID().toString().substring(0, 8);
-    String name;
-    if (user.getName() != null && !user.getName().isBlank()) {
-      name = DEFAULT_DOCUMENT_SET_NAME + " - " + user.getName() + " (" + email + ") - " + suffix;
-    } else {
-      name = DEFAULT_DOCUMENT_SET_NAME + " (" + email + ") - " + suffix;
-    }
-    return name.length() > 255 ? name.substring(0, 255) : name;
-  }
-
   private void createAndLinkDocumentSet(User user, int ccPairId) {
-    String docSetName = documentSetNameFor(user);
+    String docSetName = DocumentSetNameUtils.documentSetNameFor(DEFAULT_DOCUMENT_SET_NAME, user);
     int newDocSetId = onyxClient.createDocumentSet(docSetName, "", List.of(ccPairId));
     user.setDocSetId(newDocSetId);
     userRepository.save(user);
