@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import ru.cleardocs.backend.dto.GetMeDto;
@@ -27,5 +28,11 @@ public class UserController {
     GetMeDto response = userService.getMe(user);
     log.info("getMe() - ends with response = {}", response);
     return ResponseEntity.ok(response);
+  }
+
+  @PostMapping("/register")
+  public ResponseEntity<Void> register(@AuthenticationPrincipal User user) {
+    log.info("register() - user id = {}", user.getId());
+    return ResponseEntity.ok().build();
   }
 }
