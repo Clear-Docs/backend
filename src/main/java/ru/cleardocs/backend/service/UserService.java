@@ -2,6 +2,7 @@ package ru.cleardocs.backend.service;
 
 import com.google.firebase.auth.FirebaseToken;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.cleardocs.backend.constant.PlanCode;
@@ -44,7 +45,13 @@ public class UserService {
     User user;
     if (userOptional.isEmpty()) {
       log.info("getUser() - user is not found");
-      user = register(token);
+      try {
+        user = register(token);
+      } catch (DataIntegrityViolationException e) {
+        log.warn("getUser() - duplicate key on register, fetching existing user firebase_uid={}", token.getUid());
+        user = userRepository.findByFirebaseUid(token.getUid())
+            .orElseThrow(() -> new IllegalStateException("User creation failed due to race condition", e));
+      }
     } else {
       user = userOptional.get();
     }
