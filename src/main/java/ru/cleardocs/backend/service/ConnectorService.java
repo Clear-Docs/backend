@@ -23,13 +23,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class ConnectorService {
 
-  private static final String DEFAULT_DOCUMENT_SET_NAME = "Documents";
+  private static final String DEFAULT_DOCUMENT_SET_NAME = "Docs";
 
   private final OnyxClient onyxClient;
   private final UserRepository userRepository;
@@ -215,11 +216,28 @@ public class ConnectorService {
     }
   }
 
+  private String documentSetNameFor(User user) {
+    String email = (user.getEmail() != null && !user.getEmail().isBlank())
+        ? user.getEmail()
+        : "user";
+    String suffix = user.getId() != null
+        ? user.getId().toString().substring(0, 8)
+        : UUID.randomUUID().toString().substring(0, 8);
+    String name;
+    if (user.getName() != null && !user.getName().isBlank()) {
+      name = DEFAULT_DOCUMENT_SET_NAME + " - " + user.getName() + " (" + email + ") - " + suffix;
+    } else {
+      name = DEFAULT_DOCUMENT_SET_NAME + " (" + email + ") - " + suffix;
+    }
+    return name.length() > 255 ? name.substring(0, 255) : name;
+  }
+
   private void createAndLinkDocumentSet(User user, int ccPairId) {
-    int newDocSetId = onyxClient.createDocumentSet(DEFAULT_DOCUMENT_SET_NAME, "", List.of(ccPairId));
+    String docSetName = documentSetNameFor(user);
+    int newDocSetId = onyxClient.createDocumentSet(docSetName, "", List.of(ccPairId));
     user.setDocSetId(newDocSetId);
     userRepository.save(user);
-    log.info("createFileConnector() - created document set id = {} for user id = {}", newDocSetId, user.getId());
+    log.info("createAndLinkDocumentSet() - created document set id = {} for user id = {}", newDocSetId, user.getId());
   }
 
   private void addConnectorToExistingDocumentSet(User user, List<EntityConnectorDto> existingConnectors, int ccPairId) {

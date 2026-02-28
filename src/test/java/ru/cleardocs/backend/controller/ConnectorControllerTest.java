@@ -29,6 +29,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -148,7 +149,10 @@ class ConnectorControllerTest {
     );
     when(onyxClient.createFileConnector(eq("My Connector"), anyList(), anyList()))
         .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 456));
-    when(onyxClient.createDocumentSet(eq("Documents"), eq(""), eq(List.of(456)))).thenReturn(123);
+    when(onyxClient.createDocumentSet(
+        argThat(name -> name != null && name.startsWith("Documents") && name.contains("test@example.com")),
+        eq(""),
+        eq(List.of(456)))).thenReturn(123);
 
     MockMultipartFile file = new MockMultipartFile(
         "files",
@@ -200,7 +204,10 @@ class ConnectorControllerTest {
   void createUrlConnector_userWithoutDocSet_createsDocumentSetAndSavesToDb() throws Exception {
     when(onyxClient.createUrlConnector(eq("My Site"), eq("https://example.com")))
         .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 456));
-    when(onyxClient.createDocumentSet(eq("Documents"), eq(""), eq(List.of(456)))).thenReturn(123);
+    when(onyxClient.createDocumentSet(
+        argThat(name -> name != null && name.startsWith("Documents") && name.contains("test@example.com")),
+        eq(""),
+        eq(List.of(456)))).thenReturn(123);
 
     mockMvc.perform(post("/api/v1/connectors/url")
             .contentType(MediaType.APPLICATION_JSON)
