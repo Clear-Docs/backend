@@ -13,10 +13,13 @@ import ru.cleardocs.backend.mapper.UserMapper;
 import ru.cleardocs.backend.repository.UserRepository;
 
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
 public class UserService {
+
+  private static final ConcurrentHashMap<String, Object> REGISTRATION_LOCKS = new ConcurrentHashMap<>();
 
   private final UserMapper userMapper;
   private final PlanService planService;
@@ -38,25 +41,39 @@ public class UserService {
     return response;
   }
 
-  @Transactional
+  /** No @Transactional: register() runs in repo's own tx; when it fails with duplicate key, we catch
+   *  and refetch. Adding @Transactional here would mark the tx rollback-only and cause
+   *  UnexpectedRollbackException when returning after catch. */
   public User getByToken(FirebaseToken token) {
     log.info("getUser() - starts");
-    Optional<User> userOptional = userRepository.findByFirebaseUid(token.getUid());
+    String uid = token.getUid();
+    Optional<User> userOptional = userRepository.findByFirebaseUid(uid);
     User user;
     if (userOptional.isEmpty()) {
       log.info("getUser() - user is not found");
-      try {
-        user = register(token);
-      } catch (DataIntegrityViolationException e) {
-        log.warn("getUser() - duplicate key on register, fetching existing user firebase_uid={}", token.getUid());
-        user = userRepository.findByFirebaseUid(token.getUid())
-            .orElseThrow(() -> new IllegalStateException("User creation failed due to race condition", e));
+      synchronized (getLockFor(uid)) {
+        userOptional = userRepository.findByFirebaseUid(uid);
+        if (userOptional.isEmpty()) {
+          try {
+            user = register(token);
+          } catch (DataIntegrityViolationException e) {
+            log.warn("getUser() - duplicate key on register, fetching existing user firebase_uid={}", uid);
+            user = userRepository.findByFirebaseUid(uid)
+                .orElseThrow(() -> new IllegalStateException("User creation failed due to race condition", e));
+          }
+        } else {
+          user = userOptional.get();
+        }
       }
     } else {
       user = userOptional.get();
     }
     log.info("getUser() - ends with user = {}", user);
     return user;
+  }
+
+  private Object getLockFor(String uid) {
+    return REGISTRATION_LOCKS.computeIfAbsent(uid, k -> new Object());
   }
 
   private User register(FirebaseToken token) {
