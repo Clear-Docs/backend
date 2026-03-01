@@ -10,6 +10,7 @@ import ru.cleardocs.backend.dto.EntityConnectorDto;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.repository.UserRepository;
+import ru.cleardocs.backend.util.PersonaNameUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -54,7 +55,7 @@ public class ChatService {
 
     // 3. Create persona if missing
     if (user.getPersonaId() == null) {
-      String personaName = "Assistant-" + (user.getName() != null ? user.getName() : user.getId().toString());
+      String personaName = PersonaNameUtils.personaNameFor(user);
       int personaId = onyxClient.createPersonaWithDocumentSet(personaName, user.getDocSetId());
       user.setPersonaId(personaId);
       userRepository.save(user);
