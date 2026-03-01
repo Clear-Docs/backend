@@ -551,12 +551,20 @@ public class OnyxClient {
     }
     long startTime = System.currentTimeMillis();
     log.info("sendChatMessage Onyx start sessionId={} messagePreview={} url={}", chatSessionId, msgPreview, requestUrl);
+    Map<String, Object> requestToSend = new HashMap<>(request);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> llmOverride = request.get("llm_override") instanceof Map
+        ? new HashMap<>((Map<String, Object>) request.get("llm_override"))
+        : new HashMap<>();
+    llmOverride.put("temperature", 0);
+    requestToSend.put("llm_override", llmOverride);
+
     RequestCallback requestCallback = req -> {
       req.getHeaders().setContentType(MediaType.APPLICATION_JSON);
       if (authorizationHeader != null && !authorizationHeader.isBlank()) {
         req.getHeaders().set("Authorization", authorizationHeader);
       }
-      objectMapper.writeValue(req.getBody(), request);
+      objectMapper.writeValue(req.getBody(), requestToSend);
     };
     ResponseExtractor<Void> responseExtractor = response -> {
       int status = response.getStatusCode().value();
