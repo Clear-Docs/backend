@@ -51,8 +51,8 @@ public record OnyxConnectorCreateRequestDto(
         ),
         "public",
         List.of(),
-        1800,    // refresh_freq (30 min)
-        2592000, // prune_freq (30 days)
+        86400,   // refresh_freq (24 hours)
+        432000,  // prune_freq (5 days)
         null     // indexing_start
     );
   }
