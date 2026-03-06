@@ -26,11 +26,9 @@ import ru.cleardocs.backend.security.WithMockFirebaseUser;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -108,7 +106,6 @@ class ConnectorControllerTest {
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void createFileConnector_authenticatedUser_returns201() throws Exception {
-    when(onyxClient.getAllConnectorNames()).thenReturn(Set.of());
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of());
     when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
         new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
@@ -146,16 +143,12 @@ class ConnectorControllerTest {
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE")
   void createFileConnector_userWithoutDocSet_createsDocumentSetAndSavesToDb() throws Exception {
-    when(onyxClient.getAllConnectorNames()).thenReturn(Set.of());
     when(onyxClient.uploadFiles(any())).thenReturn(
         new OnyxFileUploadResponseDto(List.of("file-id-1"), List.of("doc.pdf"), null)
     );
     when(onyxClient.createFileConnector(eq("My Connector"), anyList(), anyList()))
         .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 456));
-    when(onyxClient.createDocumentSet(
-        argThat(name -> name != null && name.startsWith("Documents") && name.contains("test@example.com")),
-        eq(""),
-        eq(List.of(456)))).thenReturn(123);
+    when(onyxClient.createDocumentSet(eq("Documents"), eq(""), eq(List.of(456)))).thenReturn(123);
 
     MockMultipartFile file = new MockMultipartFile(
         "files",
@@ -185,7 +178,6 @@ class ConnectorControllerTest {
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
   void createUrlConnector_authenticatedUser_returns201() throws Exception {
-    when(onyxClient.getAllConnectorNames()).thenReturn(Set.of());
     when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of());
     when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
         new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
@@ -206,13 +198,9 @@ class ConnectorControllerTest {
   @Test
   @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE")
   void createUrlConnector_userWithoutDocSet_createsDocumentSetAndSavesToDb() throws Exception {
-    when(onyxClient.getAllConnectorNames()).thenReturn(Set.of());
     when(onyxClient.createUrlConnector(eq("My Site"), eq("https://example.com")))
         .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 456));
-    when(onyxClient.createDocumentSet(
-        argThat(name -> name != null && name.startsWith("Documents") && name.contains("test@example.com")),
-        eq(""),
-        eq(List.of(456)))).thenReturn(123);
+    when(onyxClient.createDocumentSet(eq("Documents"), eq(""), eq(List.of(456)))).thenReturn(123);
 
     mockMvc.perform(post("/api/v1/connectors/url")
             .contentType(MediaType.APPLICATION_JSON)
@@ -248,29 +236,6 @@ class ConnectorControllerTest {
             .content("{\"name\":\"My Site\"}")
             .with(securityContext(SecurityContextHolder.getContext())))
         .andExpect(status().isBadRequest());
-  }
-
-  @Test
-  @WithMockFirebaseUser(email = "test@example.com", name = "Test User", planCode = "FREE", docSetId = 42)
-  void createUrlConnector_duplicateName_addsPostfix() throws Exception {
-    when(onyxClient.getAllConnectorNames()).thenReturn(Set.of("My Site"));
-    when(onyxClient.getConnectorsByDocSetId(42)).thenReturn(List.of());
-    when(onyxClient.getDocumentSetById(42)).thenReturn(Optional.of(
-        new OnyxDocumentSetDto(42, "Documents", "", List.of(), List.of(), true, List.of(), List.of())
-    ));
-    when(onyxClient.createUrlConnector(
-        argThat(name -> name != null && name.startsWith("My Site - ") && name.length() > "My Site - ".length()),
-        eq("https://example.com")))
-        .thenReturn(new OnyxCreateConnectorResponseDto(true, "Created", 123));
-
-    mockMvc.perform(post("/api/v1/connectors/url")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"name\":\"My Site\",\"url\":\"https://example.com\"}")
-            .with(securityContext(SecurityContextHolder.getContext())))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.id").value(123))
-        .andExpect(jsonPath("$.name").value(org.hamcrest.Matchers.startsWith("My Site - ")))
-        .andExpect(jsonPath("$.type").value("web"));
   }
 
   @Test

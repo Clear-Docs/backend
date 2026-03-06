@@ -18,13 +18,11 @@ import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
 import ru.cleardocs.backend.exception.NotFoundException;
 import ru.cleardocs.backend.repository.UserRepository;
-import ru.cleardocs.backend.util.DocumentSetNameUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -102,11 +100,7 @@ public class ConnectorService {
       throw new BadRequestException("No valid files were uploaded.");
     }
 
-    Set<String> existingNames = onyxClient.getAllConnectorNames();
-    String uniqueName = DocumentSetNameUtils.ensureUniqueName(
-        name, existingNames, user.getId() != null ? user.getId().toString().substring(0, 8) : "user");
-
-    OnyxCreateConnectorResponseDto createResponse = onyxClient.createFileConnector(uniqueName, fileLocations, fileNames);
+    OnyxCreateConnectorResponseDto createResponse = onyxClient.createFileConnector(name, fileLocations, fileNames);
 
     if (!Boolean.TRUE.equals(createResponse.success()) || createResponse.data() == null) {
       throw new RuntimeException("Failed to create connector in Onyx: " + createResponse.message());
@@ -121,7 +115,7 @@ public class ConnectorService {
     }
 
     log.info("createFileConnector() - ends with cc_pair_id = {}", ccPairId);
-    return new CreateConnectorResponseDto(ccPairId, uniqueName, "file");
+    return new CreateConnectorResponseDto(ccPairId, name, "file");
   }
 
   @Transactional
@@ -154,11 +148,7 @@ public class ConnectorService {
           existingConnectors.size(), maxConnectors));
     }
 
-    Set<String> existingNames = onyxClient.getAllConnectorNames();
-    String uniqueName = DocumentSetNameUtils.ensureUniqueName(
-        name, existingNames, user.getId() != null ? user.getId().toString().substring(0, 8) : "user");
-
-    OnyxCreateConnectorResponseDto createResponse = onyxClient.createUrlConnector(uniqueName, url);
+    OnyxCreateConnectorResponseDto createResponse = onyxClient.createUrlConnector(name, url);
 
     if (!Boolean.TRUE.equals(createResponse.success()) || createResponse.data() == null) {
       throw new RuntimeException("Failed to create URL connector in Onyx: " + createResponse.message());
@@ -173,7 +163,7 @@ public class ConnectorService {
     }
 
     log.info("createUrlConnector() - ends with cc_pair_id = {}", ccPairId);
-    return new CreateConnectorResponseDto(ccPairId, uniqueName, "web");
+    return new CreateConnectorResponseDto(ccPairId, name, "web");
   }
 
   public void deleteConnector(User user, int connectorId) {
@@ -226,11 +216,10 @@ public class ConnectorService {
   }
 
   private void createAndLinkDocumentSet(User user, int ccPairId) {
-    String docSetName = DocumentSetNameUtils.documentSetNameFor(DEFAULT_DOCUMENT_SET_NAME, user);
-    int newDocSetId = onyxClient.createDocumentSet(docSetName, "", List.of(ccPairId));
+    int newDocSetId = onyxClient.createDocumentSet(DEFAULT_DOCUMENT_SET_NAME, "", List.of(ccPairId));
     user.setDocSetId(newDocSetId);
     userRepository.save(user);
-    log.info("createAndLinkDocumentSet() - created document set id = {} for user id = {}", newDocSetId, user.getId());
+    log.info("createFileConnector() - created document set id = {} for user id = {}", newDocSetId, user.getId());
   }
 
   private void addConnectorToExistingDocumentSet(User user, List<EntityConnectorDto> existingConnectors, int ccPairId) {
