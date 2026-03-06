@@ -1,0 +1,910 @@
+diff --git a/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClient.java b/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClient.java
+new file mode 100644
+index 0000000..d89f18a
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClient.java
+@@ -0,0 +1,72 @@
++package ru.cleardocs.backend.client.tochka;
++
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.http.HttpEntity;
++import org.springframework.http.HttpHeaders;
++import org.springframework.http.MediaType;
++import org.springframework.stereotype.Component;
++import org.springframework.web.client.RestTemplate;
++
++import java.math.BigDecimal;
++import java.util.List;
++
++@Slf4j
++@Component
++@RequiredArgsConstructor
++public class TochkaClient {
++
++    private final RestTemplate restTemplate;
++
++    @Value("${tochka.customer-code:}")
++    private String customerCode;
++
++    @Value("${tochka.merchant-id:}")
++    private String merchantId;
++
++    /**
++     * Метод для создания ссылки на оплату
++     *
++     * @param requestDto параметры ссылки на оплату
++     * @return ссылка на оплату и статус
++     */
++    public TochkaClientAcquiringPaymentResponse createAcquiringPayment(String apiKey, TochkaClientAcquiringPaymentRequest requestDto) {
++        String url = "https://enter.tochka.com/uapi/acquiring/v1.0/payments";
++        HttpHeaders headers = new HttpHeaders();
++        headers.setContentType(MediaType.APPLICATION_JSON);
++        headers.setBearerAuth(apiKey);
++
++        HttpEntity<TochkaClientAcquiringPaymentRequest> entity = new HttpEntity<>(requestDto, headers);
++        log.debug("Запрос к АПИ ТочкаБанк для создания формы оплаты: {}, requestDto: {}", url, requestDto);
++
++        try {
++            return restTemplate.postForObject(url, entity, TochkaClientAcquiringPaymentResponse.class);
++        } catch (Exception e) {
++            log.error("Ошибка при создании формы оплаты ТочкаБнак: {}", e.getMessage());
++            throw e;
++        }
++    }
++
++    /**
++     * Метод для создания ссылки на оплату
++     */
++    public TochkaClientAcquiringPaymentResponse createAcquiringPayment(
++            String apiKey,
++            String customerCode,
++            BigDecimal amount,
++            String purpose,
++            List<String> paymentMode,
++            String merchantId) {
++
++        return createAcquiringPayment(apiKey, TochkaClientAcquiringPaymentRequest.builder()
++                .data(TochkaClientAcquiringPaymentRequest.PaymentData.builder()
++                        .customerCode(customerCode)
++                        .amount(amount.toString())
++                        .purpose(purpose)
++                        .paymentMode(paymentMode)
++                        .merchantId(merchantId)
++                        .build())
++                .build());
++    }
++}
+diff --git a/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentRequest.java b/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentRequest.java
+new file mode 100644
+index 0000000..6f71e15
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentRequest.java
+@@ -0,0 +1,129 @@
++package ru.cleardocs.backend.client.tochka;
++
++import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
++import com.fasterxml.jackson.annotation.JsonProperty;
++import lombok.Builder;
++import lombok.Data;
++
++import java.util.List;
++
++@Data
++@Builder
++@JsonIgnoreProperties(ignoreUnknown = true)
++public class TochkaClientAcquiringPaymentRequest {
++
++    @JsonProperty("Data")
++    private PaymentData data;
++
++    @Data
++    @Builder
++    public static class PaymentData {
++
++        /**
++         * Уникальный код клиента
++         * <br>
++         * Possible values: 9 characters
++         * <br>
++         * Example: 300000092
++         * <br>
++         * Обязательное поле
++         */
++        private String customerCode;
++
++        /**
++         * Сумма платежа
++         * <br>
++         * Possible values: > 0
++         * <br>
++         * Example: 1234.00
++         * <br>
++         * Обязательное поле
++         */
++        private String amount;
++
++        /**
++         * Назначение платежа
++         * <br>
++         * Possible values: non-empty and <= 140 characters
++         * <br>
++         * Example: Перевод за оказанные услуги
++         * <br>
++         * Обязательное поле
++         */
++        private String purpose;
++
++        /**
++         * URL адрес, куда будет переправлен клиент после оплаты услуги
++         * <br>
++         * Possible values: non-empty and <= 2083 characters
++         * <br>
++         * Example: https://example.com
++         */
++        private String redirectUrl;
++
++        /**
++         * URL адрес, куда будет переправлен клиент в случае неуспешной оплаты
++         * <br>
++         * Possible values: non-empty and <= 2083 characters
++         * <br>
++         * Example: https://example.com/fail
++         */
++        private String failRedirectUrl;
++
++        /**
++         * Способ оплаты
++         * <br>
++         * Possible values: [sbp, card, tinkoff, dolyame], >= 1
++         * <br>
++         * Example: ["sbp","card","tinkoff","dolyame"]
++         * <br>
++         * Обязательное поле
++         */
++        private List<String> paymentMode;
++
++        /**
++         * Предложить покупателю сохранить карту
++         * <br>
++         * Example: true
++         */
++        private Boolean saveCard;
++
++        /**
++         * Идентификатор покупателя
++         * <br>
++         * Example: fedac807-078d-45ac-a43b-5c01c57edbf8
++         */
++        private String consumerId;
++
++        /**
++         * Идентификатор торговой точки в интернет-эквайринге
++         * <br>
++         * Possible values: 15 characters
++         * <br>
++         * Example: 200000000001056
++         */
++        private String merchantId;
++
++        /**
++         * Создать платёж с двухэтапной оплатой
++         */
++        private Boolean preAuthorization;
++
++        /**
++         * Время жизни платёжной ссылки в минутах
++         * <br>
++         * Possible values: >= 1 and <= 44640
++         * <br>
++         * Default value: 10080
++         */
++        private Integer ttl;
++
++        /**
++         * Уникальный номер заказа
++         * <br>
++         * Possible values: non-empty and <= 45 characters
++         */
++        private String paymentLinkId;
++
++    }
++}
+diff --git a/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentResponse.java b/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentResponse.java
+new file mode 100644
+index 0000000..7bcac67
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentResponse.java
+@@ -0,0 +1,113 @@
++package ru.cleardocs.backend.client.tochka;
++
++import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
++import com.fasterxml.jackson.annotation.JsonProperty;
++import lombok.AllArgsConstructor;
++import lombok.Builder;
++import lombok.Data;
++import lombok.NoArgsConstructor;
++
++import java.util.List;
++
++@Data
++@Builder
++@NoArgsConstructor
++@AllArgsConstructor
++@JsonIgnoreProperties(ignoreUnknown = true)
++public class TochkaClientAcquiringPaymentResponse {
++
++    @JsonProperty("Data")
++    private PaymentData data;
++
++    @JsonProperty("Links")
++    private Links links;
++
++    @JsonProperty("Meta")
++    private Meta meta;
++
++    @Data
++    @NoArgsConstructor
++    @AllArgsConstructor
++    @JsonIgnoreProperties(ignoreUnknown = true)
++    public static class PaymentData {
++
++        /**
++         * Назначение платежа
++         * Example: Футболка женская молочная
++         */
++        private String purpose;
++
++        /**
++         * Статус операции
++         * Possible values: [CREATED, APPROVED, ON-REFUND, REFUNDED, EXPIRED, REFUNDED_PARTIALLY, AUTHORIZED, WAIT_FULL_PAYMENT]
++         * Example: CREATED
++         */
++        private String status;
++
++        /**
++         * Сумма платежа
++         * Example: 1234.00
++         */
++        private String amount;
++
++        /**
++         * Идентификатор платежа
++         * Example: 48232c9a-ce82-1593-3cb6-5c85a1ffef8f
++         */
++        private String operationId;
++
++        /**
++         * Ссылка на оплату
++         * Example: https://merch.example.com/order/?uuid=16ea4c54-bf1d-4e6a-a1ef-53ad55666e43
++         */
++        private String paymentLink;
++
++        /**
++         * Идентификатор покупателя
++         * Example: fedac807-078d-45ac-a43b-5c01c57edbf8
++         */
++        private String consumerId;
++
++        /**
++         * Идентификатор торговой точки в интернет-эквайринге
++         * Example: 200000000001056
++         */
++        private String merchantId;
++
++        /**
++         * Создать платёж с двухэтапной оплатой
++         */
++        private Boolean preAuthorization;
++
++        /**
++         * Время жизни платёжной ссылки в минутах
++         */
++        private Integer ttl;
++
++        /**
++         * Уникальный номер заказа
++         */
++        private String paymentLinkId;
++
++        /**
++         * Способ оплаты
++         */
++        private List<String> paymentMode;
++    }
++
++    @Data
++    @NoArgsConstructor
++    @AllArgsConstructor
++    @JsonIgnoreProperties(ignoreUnknown = true)
++    public static class Links {
++        private String self;
++    }
++
++    @Data
++    @NoArgsConstructor
++    @AllArgsConstructor
++    @JsonIgnoreProperties(ignoreUnknown = true)
++    public static class Meta {
++        private Integer totalPages;
++    }
++}
+diff --git a/src/main/java/ru/cleardocs/backend/constant/PaymentStatus.java b/src/main/java/ru/cleardocs/backend/constant/PaymentStatus.java
+new file mode 100644
+index 0000000..8a1db86
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/constant/PaymentStatus.java
+@@ -0,0 +1,21 @@
++package ru.cleardocs.backend.constant;
++
++import lombok.Getter;
++import lombok.RequiredArgsConstructor;
++
++/**
++ * Статусы платежей <br>
++ * <li>
++ *     <ul>CREATED Создан</ul>
++ *     <ul>PENDING Создан, ожидает оплаты</ul>
++ * </li>
++ */
++@Getter
++@RequiredArgsConstructor
++public enum PaymentStatus {
++    CREATED("CREATED"),
++    PENDING("PENDING");
++
++    private final String status;
++
++}
+diff --git a/src/main/java/ru/cleardocs/backend/constant/PaymentSystemEnum.java b/src/main/java/ru/cleardocs/backend/constant/PaymentSystemEnum.java
+new file mode 100644
+index 0000000..bc025fd
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/constant/PaymentSystemEnum.java
+@@ -0,0 +1,17 @@
++package ru.cleardocs.backend.constant;
++
++import lombok.Getter;
++import lombok.RequiredArgsConstructor;
++
++/**
++ * Платежные системы
++ */
++@Getter
++@RequiredArgsConstructor
++public enum PaymentSystemEnum {
++
++    TOCHKA("TOCHKA");
++
++    private final String paymentSystemName;
++
++}
+diff --git a/src/main/java/ru/cleardocs/backend/controller/PaymentController.java b/src/main/java/ru/cleardocs/backend/controller/PaymentController.java
+new file mode 100644
+index 0000000..f323c44
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/controller/PaymentController.java
+@@ -0,0 +1,40 @@
++package ru.cleardocs.backend.controller;
++
++import io.swagger.v3.oas.annotations.Operation;
++import io.swagger.v3.oas.annotations.media.Content;
++import io.swagger.v3.oas.annotations.media.Schema;
++import io.swagger.v3.oas.annotations.responses.ApiResponse;
++import io.swagger.v3.oas.annotations.responses.ApiResponses;
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.http.ResponseEntity;
++import org.springframework.security.core.annotation.AuthenticationPrincipal;
++import org.springframework.web.bind.annotation.PostMapping;
++import org.springframework.web.bind.annotation.RequestBody;
++import org.springframework.web.bind.annotation.RequestMapping;
++import org.springframework.web.bind.annotation.RestController;
++import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
++import ru.cleardocs.backend.dto.TochkaPaymentResponseDto;
++import ru.cleardocs.backend.entity.User;
++import ru.cleardocs.backend.service.TochkaPaymentService;
++
++@Slf4j
++@RestController
++@RequiredArgsConstructor
++@RequestMapping("/api/v1/pay")
++public class PaymentController {
++
++    private final TochkaPaymentService tochkaPaymentService;
++
++    @Operation(summary = "Инициализация платежа через Точка банк")
++    @ApiResponses(value = {
++            @ApiResponse(responseCode = "200", description = "Успешная Инициализация платежа через Точка банк",
++                    content = {@Content(mediaType = "application/json", schema = @Schema(implementation = TochkaPaymentResponseDto.class))}),
++            @ApiResponse(responseCode = "500", description = "Ошибка инициализации платежа")
++    })
++    @PostMapping("/tochka/createPayment")
++    public ResponseEntity<TochkaPaymentResponseDto> createTochkaPayment(@RequestBody TochkaPaymentRequestDto request, @AuthenticationPrincipal User user) {
++        return ResponseEntity.ok(tochkaPaymentService.createPayment(request, user));
++    }
++
++}
+diff --git a/src/main/java/ru/cleardocs/backend/dto/TochkaPaymentRequestDto.java b/src/main/java/ru/cleardocs/backend/dto/TochkaPaymentRequestDto.java
+new file mode 100644
+index 0000000..f1c2510
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/dto/TochkaPaymentRequestDto.java
+@@ -0,0 +1,6 @@
++package ru.cleardocs.backend.dto;
++
++import java.util.UUID;
++
++public record TochkaPaymentRequestDto(UUID planId) {
++}
+diff --git a/src/main/java/ru/cleardocs/backend/dto/TochkaPaymentResponseDto.java b/src/main/java/ru/cleardocs/backend/dto/TochkaPaymentResponseDto.java
+new file mode 100644
+index 0000000..9e05716
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/dto/TochkaPaymentResponseDto.java
+@@ -0,0 +1,4 @@
++package ru.cleardocs.backend.dto;
++
++public record TochkaPaymentResponseDto(String paymentUrl) {
++}
+diff --git a/src/main/java/ru/cleardocs/backend/entity/Payment.java b/src/main/java/ru/cleardocs/backend/entity/Payment.java
+new file mode 100644
+index 0000000..993fe6b
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/entity/Payment.java
+@@ -0,0 +1,63 @@
++package ru.cleardocs.backend.entity;
++
++import jakarta.persistence.*;
++import lombok.*;
++import ru.cleardocs.backend.constant.PaymentStatus;
++import ru.cleardocs.backend.constant.PaymentSystemEnum;
++
++import java.math.BigDecimal;
++import java.time.LocalDateTime;
++import java.util.UUID;
++
++@Data
++@Entity
++@Builder
++@ToString
++@NoArgsConstructor
++@AllArgsConstructor
++@Table(name = "payments")
++public class Payment {
++
++    @Id
++    @GeneratedValue
++    private UUID id;
++
++    @Column(name = "payment_system")
++    @Enumerated(EnumType.STRING)
++    private PaymentSystemEnum paymentSystem;
++
++    @Column(name = "payment_status")
++    @Enumerated(EnumType.STRING)
++    private PaymentStatus paymentStatus;
++
++    @ManyToOne
++    @JoinColumn(name = "user_id")
++    private User user;
++
++    @ManyToOne
++    @JoinColumn(name = "plan_id")
++    private Plan plan;
++    
++    private BigDecimal amount;
++
++    @Column(name = "external_id")
++    private String externalId;
++
++    @Column(name = "created_at")
++    private LocalDateTime createdAt;
++
++    @Column(name = "updated_at")
++    private LocalDateTime updatedAt;
++
++    @PrePersist
++    public void prePersist() {
++        this.createdAt = LocalDateTime.now();
++        this.updatedAt = LocalDateTime.now();
++    }
++
++    @PreUpdate
++    public void preUpdate() {
++        this.updatedAt = LocalDateTime.now();
++    }
++
++}
+diff --git a/src/main/java/ru/cleardocs/backend/exception/CreatePaymentException.java b/src/main/java/ru/cleardocs/backend/exception/CreatePaymentException.java
+new file mode 100644
+index 0000000..2b15955
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/exception/CreatePaymentException.java
+@@ -0,0 +1,7 @@
++package ru.cleardocs.backend.exception;
++
++public class CreatePaymentException extends RuntimeException {
++    public CreatePaymentException(String message) {
++        super(message);
++    }
++}
+diff --git a/src/main/java/ru/cleardocs/backend/mapper/TochkaPaymentMapper.java b/src/main/java/ru/cleardocs/backend/mapper/TochkaPaymentMapper.java
+new file mode 100644
+index 0000000..05c091d
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/mapper/TochkaPaymentMapper.java
+@@ -0,0 +1,14 @@
++package ru.cleardocs.backend.mapper;
++
++import org.springframework.stereotype.Component;
++import ru.cleardocs.backend.client.tochka.TochkaClientAcquiringPaymentResponse;
++import ru.cleardocs.backend.dto.TochkaPaymentResponseDto;
++
++@Component
++public class TochkaPaymentMapper {
++
++    public TochkaPaymentResponseDto mapToPaymentResponseDto(TochkaClientAcquiringPaymentResponse clientResponse) {
++        return new TochkaPaymentResponseDto(clientResponse.getData().getPaymentLink());
++    }
++
++}
+diff --git a/src/main/java/ru/cleardocs/backend/repository/PaymentRepository.java b/src/main/java/ru/cleardocs/backend/repository/PaymentRepository.java
+new file mode 100644
+index 0000000..463b64f
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/repository/PaymentRepository.java
+@@ -0,0 +1,12 @@
++package ru.cleardocs.backend.repository;
++
++import org.springframework.data.jpa.repository.JpaRepository;
++import org.springframework.stereotype.Repository;
++import ru.cleardocs.backend.entity.Payment;
++
++import java.util.UUID;
++
++@Repository
++public interface PaymentRepository extends JpaRepository<Payment, UUID> {
++
++}
+diff --git a/src/main/java/ru/cleardocs/backend/service/PaymentService.java b/src/main/java/ru/cleardocs/backend/service/PaymentService.java
+new file mode 100644
+index 0000000..cfcf87f
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/service/PaymentService.java
+@@ -0,0 +1,21 @@
++package ru.cleardocs.backend.service;
++
++
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.stereotype.Service;
++import ru.cleardocs.backend.entity.Payment;
++import ru.cleardocs.backend.repository.PaymentRepository;
++
++@Slf4j
++@Service
++@RequiredArgsConstructor
++public class PaymentService {
++
++    private final PaymentRepository paymentRepository;
++
++    public Payment save(Payment payment) {
++        return paymentRepository.save(payment);
++    }
++
++}
+diff --git a/src/main/java/ru/cleardocs/backend/service/TochkaPaymentService.java b/src/main/java/ru/cleardocs/backend/service/TochkaPaymentService.java
+new file mode 100644
+index 0000000..fe018bd
+--- /dev/null
++++ b/src/main/java/ru/cleardocs/backend/service/TochkaPaymentService.java
+@@ -0,0 +1,70 @@
++package ru.cleardocs.backend.service;
++
++import jakarta.transaction.Transactional;
++import lombok.RequiredArgsConstructor;
++import lombok.extern.slf4j.Slf4j;
++import org.springframework.beans.factory.annotation.Value;
++import org.springframework.stereotype.Service;
++import ru.cleardocs.backend.client.tochka.TochkaClient;
++import ru.cleardocs.backend.constant.PaymentStatus;
++import ru.cleardocs.backend.constant.PaymentSystemEnum;
++import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
++import ru.cleardocs.backend.dto.TochkaPaymentResponseDto;
++import ru.cleardocs.backend.entity.Payment;
++import ru.cleardocs.backend.entity.User;
++import ru.cleardocs.backend.exception.CreatePaymentException;
++import ru.cleardocs.backend.mapper.TochkaPaymentMapper;
++import ru.cleardocs.backend.repository.PlanRepository;
++
++import java.math.BigDecimal;
++import java.util.List;
++
++@Slf4j
++@Service
++@RequiredArgsConstructor
++public class TochkaPaymentService {
++
++    private final TochkaClient tochkaClient;
++    private final TochkaPaymentMapper tochkaPaymentMapper;
++    private final PaymentService paymentService;
++    private final PlanRepository planRepository;
++
++    @Value("${tochka.api-key:}")
++    private String apiKey;
++
++    @Value("${tochka.customer-code:}")
++    private String customerCode;
++
++    @Value("${tochka.merchant-id:}")
++    private String merchantId;
++
++    @Value("${tochka.purpose:\"\"}")
++    private String purpose;
++
++    @Value("${tochka.payment-modes:sbp,card,tinkoff}")
++    private List<String> paymentMode;
++
++    /**
++     * Создать платеж через точка банк
++     *
++     * @param user пользователь
++     * @return ссылка на оплату
++     */
++    @Transactional
++    public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, User user) {
++        var plan = planRepository.findById(user.getPlan().getId()).orElseThrow(() -> new CreatePaymentException("user plan is empty"));
++        BigDecimal amount = BigDecimal.valueOf(plan.getPriceRub());
++        var response = tochkaClient.createAcquiringPayment(apiKey, apiKey, amount, purpose, paymentMode, merchantId);
++
++        var payment = Payment.builder()
++                .paymentSystem(PaymentSystemEnum.TOCHKA)
++                .paymentStatus(PaymentStatus.PENDING)
++                .user(user)
++                .plan(plan)
++                .amount(amount)
++                .externalId(response.getData().getOperationId())
++                .build();
++        paymentService.save(payment);
++        return tochkaPaymentMapper.mapToPaymentResponseDto(response);
++    }
++}
+diff --git a/src/main/resources/application.properties b/src/main/resources/application.properties
+index c360e04..3da2564 100644
+--- a/src/main/resources/application.properties
++++ b/src/main/resources/application.properties
+@@ -19,4 +19,11 @@ cors.allowed-origins=
+ # All paths built from onyx.manage-path, e.g. /manage/document-set, /manage/admin/...
+ onyx.base-url=http://155.212.162.11:3000/api
+ onyx.manage-path=/manage
+-onyx.api-key=
+\ No newline at end of file
++onyx.api-key=
++
++tochka.api-key=
++tochka.customer-code=
++# merchant-id ????????????? ???????? ????? ? ????????-?????????? | Possible values: 15 characters | Example: 200000000001056 | ?? ???????????
++tochka.merchant-id=
++tochka.purpose="?????? ????????"
++tochka.payment-modes=sbp,card,tinkoff
+\ No newline at end of file
+diff --git a/src/main/resources/db/migration/V6__create_payments_table.sql b/src/main/resources/db/migration/V6__create_payments_table.sql
+new file mode 100644
+index 0000000..8ad8050
+--- /dev/null
++++ b/src/main/resources/db/migration/V6__create_payments_table.sql
+@@ -0,0 +1,20 @@
++ CREATE TABLE payments
++(
++    id             UUID                        NOT NULL,
++    payment_system VARCHAR(255),
++    payment_status VARCHAR(255),
++    user_id        UUID,
++    plan_id        UUID,
++    amount         DECIMAL,
++    external_id    VARCHAR(255),
++    created_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL,
++    updated_at     TIMESTAMP WITHOUT TIME ZONE NOT NULL,
++    CONSTRAINT pk_payments PRIMARY KEY (id)
++);
++
++ALTER TABLE payments
++    ADD CONSTRAINT fk_payments_on_plan FOREIGN KEY (plan_id) REFERENCES plans (id);
++
++ALTER TABLE payments
++    ADD CONSTRAINT fk_payments_on_user FOREIGN KEY (user_id) REFERENCES users (id);
++plan_id        UUID,
+diff --git a/src/test/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentRequestTest.java b/src/test/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentRequestTest.java
+new file mode 100644
+index 0000000..798d6be
+--- /dev/null
++++ b/src/test/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentRequestTest.java
+@@ -0,0 +1,43 @@
++package ru.cleardocs.backend.client.tochka;
++
++import com.fasterxml.jackson.core.JsonProcessingException;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.Test;
++
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class TochkaClientAcquiringPaymentRequestTest {
++
++    private final ObjectMapper objectMapper = new ObjectMapper();
++
++    @Test
++    void testSerialization() throws JsonProcessingException {
++        TochkaClientAcquiringPaymentRequest request = TochkaClientAcquiringPaymentRequest.builder()
++                .data(TochkaClientAcquiringPaymentRequest.PaymentData.builder()
++                        .customerCode("300000092")
++                        .amount("1234.00")
++                        .purpose("Перевод за оказанные услуги")
++                        .redirectUrl("https://example.com")
++                        .failRedirectUrl("https://example.com/fail")
++                        .paymentMode(List.of("sbp", "card", "tinkoff", "dolyame"))
++                        .saveCard(true)
++                        .consumerId("fedac807-078d-45ac-a43b-5c01c57edbf8")
++                        .merchantId("200000000001056")
++                        .preAuthorization(true)
++                        .ttl(10080)
++                        .paymentLinkId("string")
++                        .build())
++                .build();
++
++        String json = objectMapper.writeValueAsString(request);
++
++        assertTrue(json.contains("\"Data\""));
++        assertTrue(json.contains("\"customerCode\":\"300000092\""));
++        assertTrue(json.contains("\"amount\":\"1234.00\""));
++        assertTrue(json.contains("\"paymentMode\":[\"sbp\",\"card\",\"tinkoff\",\"dolyame\"]"));
++        assertTrue(json.contains("\"saveCard\":true"));
++        assertTrue(json.contains("\"ttl\":10080"));
++    }
++}
+diff --git a/src/test/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentResponseTest.java b/src/test/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentResponseTest.java
+new file mode 100644
+index 0000000..622b80f
+--- /dev/null
++++ b/src/test/java/ru/cleardocs/backend/client/tochka/TochkaClientAcquiringPaymentResponseTest.java
+@@ -0,0 +1,67 @@
++package ru.cleardocs.backend.client.tochka;
++
++import com.fasterxml.jackson.databind.ObjectMapper;
++import org.junit.jupiter.api.Test;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++class TochkaClientAcquiringPaymentResponseTest {
++
++    private final ObjectMapper objectMapper = new ObjectMapper();
++
++    @Test
++    void testDeserialization() throws Exception {
++        String json = """
++                {
++                  "Data": {
++                    "purpose": "Футболка женская",
++                    "status": "CREATED",
++                    "amount": "1234.00",
++                    "operationId": "48232c9a-ce82-1593-3cb6-5c85a1ffef8f",
++                    "paymentLink": "https://merch.example.com/order/?uuid=16ea4c54-bf1d-4e6a-a1ef-53ad55666e43",
++                    "consumerId": "fedac807-078d-45ac-a43b-5c01c57edbf8",
++                    "merchantId": "200000000001056",
++                    "preAuthorization": true,
++                    "ttl": 10080,
++                    "paymentLinkId": "string",
++                    "paymentMode": [
++                      "sbp",
++                      "card",
++                      "tinkoff",
++                      "dolyame"
++                    ]
++                  },
++                  "Links": {
++                    "self": "https://enter.tochka.com/uapi"
++                  },
++                  "Meta": {
++                    "totalPages": 1
++                  }
++                }
++                """;
++
++        TochkaClientAcquiringPaymentResponse response = objectMapper.readValue(json, TochkaClientAcquiringPaymentResponse.class);
++
++        assertNotNull(response);
++        assertNotNull(response.getData());
++        assertEquals("Футболка женская", response.getData().getPurpose());
++        assertEquals("CREATED", response.getData().getStatus());
++        assertEquals("1234.00", response.getData().getAmount());
++        assertEquals("48232c9a-ce82-1593-3cb6-5c85a1ffef8f", response.getData().getOperationId());
++        assertEquals("https://merch.example.com/order/?uuid=16ea4c54-bf1d-4e6a-a1ef-53ad55666e43", response.getData().getPaymentLink());
++        assertEquals("fedac807-078d-45ac-a43b-5c01c57edbf8", response.getData().getConsumerId());
++        assertEquals("200000000001056", response.getData().getMerchantId());
++        assertTrue(response.getData().getPreAuthorization());
++        assertEquals(10080, response.getData().getTtl());
++        assertEquals("string", response.getData().getPaymentLinkId());
++        assertNotNull(response.getData().getPaymentMode());
++        assertEquals(4, response.getData().getPaymentMode().size());
++        assertTrue(response.getData().getPaymentMode().contains("sbp"));
++
++        assertNotNull(response.getLinks());
++        assertEquals("https://enter.tochka.com/uapi", response.getLinks().getSelf());
++
++        assertNotNull(response.getMeta());
++        assertEquals(1, response.getMeta().getTotalPages());
++    }
++}
+diff --git a/src/test/java/ru/cleardocs/backend/service/TochkaPaymentServiceTest.java b/src/test/java/ru/cleardocs/backend/service/TochkaPaymentServiceTest.java
+new file mode 100644
+index 0000000..2cfd31f
+--- /dev/null
++++ b/src/test/java/ru/cleardocs/backend/service/TochkaPaymentServiceTest.java
+@@ -0,0 +1,64 @@
++package ru.cleardocs.backend.service;
++
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.extension.ExtendWith;
++import org.mockito.InjectMocks;
++import org.mockito.Mock;
++import org.mockito.Spy;
++import org.mockito.junit.jupiter.MockitoExtension;
++import ru.cleardocs.backend.client.tochka.TochkaClient;
++import ru.cleardocs.backend.client.tochka.TochkaClientAcquiringPaymentResponse;
++import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
++import ru.cleardocs.backend.entity.Plan;
++import ru.cleardocs.backend.entity.User;
++import ru.cleardocs.backend.mapper.TochkaPaymentMapper;
++
++import java.util.UUID;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.mockito.ArgumentMatchers.any;
++import static org.mockito.Mockito.when;
++
++@ExtendWith(MockitoExtension.class)
++class TochkaPaymentServiceTest {
++
++    @Mock
++    TochkaClient tochkaClient;
++
++    @Mock
++    PaymentService paymentService;
++
++    @Mock
++    ru.cleardocs.backend.repository.PlanRepository planRepository;
++
++    @Spy
++    TochkaPaymentMapper tochkaPaymentMapper;
++
++    @InjectMocks
++    TochkaPaymentService tochkaPaymentService;
++
++    @Test
++    void createPayment() {
++        var paymentLink = "https://merch.example.com/order/?uuid=16ea4c54-bf1d-4e6a-a1ef-53ad55666e43";
++        var operationId = "48232c9a-ce82-1593-3cb6-5c85a1ffef8f";
++
++        UUID userId = UUID.fromString("fedac807-078d-45ac-a43b-5c01c57edbf8");
++        User user = User.builder()
++                .id(userId)
++                .plan(Plan.builder().priceRub(100).build())
++                .build();
++
++        TochkaClientAcquiringPaymentResponse mockResponse = new TochkaClientAcquiringPaymentResponse();
++        TochkaClientAcquiringPaymentResponse.PaymentData data = new TochkaClientAcquiringPaymentResponse.PaymentData();
++        data.setOperationId(operationId);
++        data.setPaymentLink(paymentLink);
++        mockResponse.setData(data);
++
++        when(planRepository.findById(any())).thenReturn(java.util.Optional.of(user.getPlan()));
++        when(tochkaClient.createAcquiringPayment(any(), any(), any(), any(), any(), any()))
++                .thenReturn(mockResponse);
++
++        var response = tochkaPaymentService.createPayment(new TochkaPaymentRequestDto(UUID.randomUUID()), user);
++        assertEquals(paymentLink, response.paymentUrl());
++    }
++}

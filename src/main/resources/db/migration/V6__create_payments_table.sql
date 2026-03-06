@@ -17,4 +17,4 @@ ALTER TABLE payments
 
 ALTER TABLE payments
     ADD CONSTRAINT fk_payments_on_user FOREIGN KEY (user_id) REFERENCES users (id);
-plan_id        UUID,
+

@@ -51,10 +51,10 @@ public class TochkaPaymentService {
      * @return ссылка на оплату
      */
     @Transactional
-    public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, User user) {
-        var plan = planRepository.findById(user.getPlan().getId()).orElseThrow(() -> new CreatePaymentException("user plan is empty"));
+public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, User user) {
+        var plan = planRepository.findById(request.planId()).orElseThrow(() -> new CreatePaymentException("user plan is empty"));
         BigDecimal amount = BigDecimal.valueOf(plan.getPriceRub());
-        var response = tochkaClient.createAcquiringPayment(apiKey, apiKey, amount, purpose, paymentMode, merchantId);
+        var response = tochkaClient.createAcquiringPayment(apiKey, customerCode, amount, purpose, paymentMode, merchantId);
 
         var payment = Payment.builder()
                 .paymentSystem(PaymentSystemEnum.TOCHKA)
