@@ -42,12 +42,6 @@ public class TochkaPaymentService {
     @Value("${tochka.purpose:\"\"}")
     private String purpose;
 
-    @Value("${tochka.redirect-url:}")
-    private String redirectUrl;
-
-    @Value("${tochka.fail-redirect-url:}")
-    private String failRedirectUrl;
-
     /**
      * Создать подписку через Точка Банк (Create Subscription).
      * Возвращает ссылку на первую оплату — после оплаты подписка активируется, списания ежемесячно.
@@ -79,8 +73,6 @@ public class TochkaPaymentService {
                         .customerCode(customerCode)
                         .amount(amount.toString())
                         .purpose(purpose)
-                        .redirectUrl(redirectUrl)
-                        .failRedirectUrl(failRedirectUrl)
                         .consumerId(user.getId().toString())
                         .recurring(true)
                         .options(TochkaCreateSubscriptionRequest.SubscriptionOptions.builder()
