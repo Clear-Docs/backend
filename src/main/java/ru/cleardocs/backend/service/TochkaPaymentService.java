@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.cleardocs.backend.client.tochka.TochkaClient;
 import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
+import ru.cleardocs.backend.constant.PlanCode;
 import ru.cleardocs.backend.constant.PaymentStatus;
 import ru.cleardocs.backend.constant.PaymentSystemEnum;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
@@ -46,16 +47,22 @@ public class TochkaPaymentService {
      * @return ссылка на оплату
      */
     @Transactional
-public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, User user) {
-        if (request.planId() == null) {
-            throw new CreatePaymentException("planId is required");
+    public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, User user) {
+        if (request.planCode() == null || request.planCode().isBlank()) {
+            throw new CreatePaymentException("planCode is required");
         }
-        var plan = planRepository.findById(request.planId()).orElseThrow(() -> new CreatePaymentException("Plan not found with id: " + request.planId()));
+        PlanCode planCode;
+        try {
+            planCode = PlanCode.valueOf(request.planCode().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new CreatePaymentException("Unknown planCode: " + request.planCode() + ". Use code from GET /api/v1/plans (e.g. MONTH)");
+        }
+        var plan = planRepository.findByCode(planCode).orElseThrow(() -> new CreatePaymentException("Plan not found with code: " + planCode));
         BigDecimal amount = BigDecimal.valueOf(plan.getPriceRub());
 
         var customersResponse = tochkaClient.getCustomersList(apiKey);
         var customerCode = resolveBusinessCustomerCode(customersResponse);
-        log.info("Tochka createPayment: using customerCode={}, planId={}, amount={}", customerCode, request.planId(), amount);
+        log.info("Tochka createPayment: using customerCode={}, planCode={}, amount={}", customerCode, planCode, amount);
 
         var response = tochkaClient.createAcquiringPayment(apiKey, customerCode, amount, purpose, paymentMode);
 
