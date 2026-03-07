@@ -29,8 +29,6 @@ services:
       ONYX_API_KEY: ${ONYX_API_KEY}
       TOCHKA_API_KEY: ${TOCHKA_API_KEY}
       TOCHKA_PURPOSE: ${TOCHKA_PURPOSE}
-      TOCHKA_REDIRECT_URL: ${TOCHKA_REDIRECT_URL:-}
-      TOCHKA_FAIL_REDIRECT_URL: ${TOCHKA_FAIL_REDIRECT_URL:-}
     volumes:
       - ./firebase-key.json:/app/firebase-key.json:ro
     ports:

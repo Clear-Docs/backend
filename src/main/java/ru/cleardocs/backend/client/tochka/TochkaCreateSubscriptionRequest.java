@@ -22,8 +22,6 @@ public class TochkaCreateSubscriptionRequest {
         private String customerCode;
         private String amount;
         private String purpose;
-        private String redirectUrl;
-        private String failRedirectUrl;
         private Boolean saveCard;
         private String consumerId;
         private Boolean recurring;
