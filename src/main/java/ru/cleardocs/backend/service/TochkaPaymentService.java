@@ -74,7 +74,6 @@ public class TochkaPaymentService {
                         .amount(amount.toString())
                         .purpose(purpose)
                         .consumerId(user.getId().toString())
-                        .recurring(true)
                         .options(TochkaCreateSubscriptionRequest.SubscriptionOptions.builder()
                                 .period("Month")
                                 .trancheCount(12)

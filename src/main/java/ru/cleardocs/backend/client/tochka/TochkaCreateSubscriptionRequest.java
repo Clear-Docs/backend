@@ -24,7 +24,6 @@ public class TochkaCreateSubscriptionRequest {
         private String purpose;
         private Boolean saveCard;
         private String consumerId;
-        private Boolean recurring;
 
         @JsonProperty("Options")
         private SubscriptionOptions options;
