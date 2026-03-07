@@ -63,6 +63,58 @@ public class TochkaClient {
     }
 
     /**
+     * Создать подписку (Create Subscription).
+     * POST /acquiring/v1.0/subscriptions
+     *
+     * @param apiKey JWT-токен
+     * @param request параметры подписки
+     * @return ответ с operationId и paymentLink
+     */
+    public TochkaCreateSubscriptionResponse createSubscription(String apiKey, TochkaCreateSubscriptionRequest request) {
+        String url = "https://enter.tochka.com/uapi/acquiring/v1.0/subscriptions";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        HttpEntity<TochkaCreateSubscriptionRequest> entity = new HttpEntity<>(request, headers);
+        log.debug("Запрос к АПИ ТочкаБанк Create Subscription: {}", url);
+
+        try {
+            return restTemplate.postForObject(url, entity, TochkaCreateSubscriptionResponse.class);
+        } catch (Exception e) {
+            log.error("Ошибка при создании подписки ТочкаБанк: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Установить статус подписки (Set Subscription Status).
+     * POST /acquiring/v1.0/subscriptions/{operationId}/status
+     * Используется для отмены подписки (status=Cancelled).
+     *
+     * @param apiKey      JWT-токен
+     * @param operationId идентификатор подписки
+     * @return ответ с результатом операции
+     */
+    public TochkaSetSubscriptionStatusResponse setSubscriptionStatus(String apiKey, String operationId) {
+        String url = "https://enter.tochka.com/uapi/acquiring/v1.0/subscriptions/" + operationId + "/status";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        var request = TochkaSetSubscriptionStatusRequest.cancelled();
+        HttpEntity<TochkaSetSubscriptionStatusRequest> entity = new HttpEntity<>(request, headers);
+        log.debug("Запрос к АПИ ТочкаБанк Set Subscription Status: {} operationId={}", url, operationId);
+
+        try {
+            return restTemplate.postForObject(url, entity, TochkaSetSubscriptionStatusResponse.class);
+        } catch (Exception e) {
+            log.error("Ошибка при отмене подписки ТочкаБанк: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
      * Получить список клиентов (Get Customers List).
      * Используется для получения customerCode — нужен для tochka.customer-code.
      * customerCode берётся из записи с customerType: "Business".

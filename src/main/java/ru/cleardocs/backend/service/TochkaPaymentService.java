@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import ru.cleardocs.backend.client.tochka.TochkaCreateSubscriptionRequest;
+import ru.cleardocs.backend.client.tochka.TochkaCreateSubscriptionResponse;
 import ru.cleardocs.backend.client.tochka.TochkaClient;
 import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
 import ru.cleardocs.backend.constant.PlanCode;
@@ -13,10 +15,12 @@ import ru.cleardocs.backend.constant.PaymentSystemEnum;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
 import ru.cleardocs.backend.dto.TochkaPaymentResponseDto;
 import ru.cleardocs.backend.entity.Payment;
+import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.CreatePaymentException;
 import ru.cleardocs.backend.mapper.TochkaPaymentMapper;
 import ru.cleardocs.backend.repository.PlanRepository;
+import ru.cleardocs.backend.repository.UserRepository;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -30,6 +34,7 @@ public class TochkaPaymentService {
     private final TochkaPaymentMapper tochkaPaymentMapper;
     private final PaymentService paymentService;
     private final PlanRepository planRepository;
+    private final UserRepository userRepository;
 
     @Value("${tochka.api-key:}")
     private String apiKey;
@@ -37,13 +42,18 @@ public class TochkaPaymentService {
     @Value("${tochka.purpose:\"\"}")
     private String purpose;
 
-    @Value("${tochka.payment-modes:sbp,card,tinkoff}")
-    private List<String> paymentMode;
+    @Value("${tochka.redirect-url:}")
+    private String redirectUrl;
+
+    @Value("${tochka.fail-redirect-url:}")
+    private String failRedirectUrl;
 
     /**
-     * Создать платеж через точка банк
+     * Создать подписку через Точка Банк (Create Subscription).
+     * Возвращает ссылку на первую оплату — после оплаты подписка активируется, списания ежемесячно.
      *
-     * @param user пользователь
+     * @param request planCode (например MONTH)
+     * @param user    пользователь
      * @return ссылка на оплату
      */
     @Transactional
@@ -57,14 +67,34 @@ public class TochkaPaymentService {
         } catch (IllegalArgumentException e) {
             throw new CreatePaymentException("Unknown planCode: " + request.planCode() + ". Use code from GET /api/v1/plans (e.g. MONTH)");
         }
-        var plan = planRepository.findByCode(planCode).orElseThrow(() -> new CreatePaymentException("Plan not found with code: " + planCode));
+        Plan plan = planRepository.findByCode(planCode).orElseThrow(() -> new CreatePaymentException("Plan not found with code: " + planCode));
         BigDecimal amount = BigDecimal.valueOf(plan.getPriceRub());
 
         var customersResponse = tochkaClient.getCustomersList(apiKey);
         var customerCode = resolveBusinessCustomerCode(customersResponse);
-        log.info("Tochka createPayment: using customerCode={}, planCode={}, amount={}", customerCode, planCode, amount);
+        log.info("Tochka createSubscription: using customerCode={}, planCode={}, amount={}", customerCode, planCode, amount);
 
-        var response = tochkaClient.createAcquiringPayment(apiKey, customerCode, amount, purpose, paymentMode);
+        var subscriptionRequest = TochkaCreateSubscriptionRequest.builder()
+                .data(TochkaCreateSubscriptionRequest.SubscriptionData.builder()
+                        .customerCode(customerCode)
+                        .amount(amount.toString())
+                        .purpose(purpose)
+                        .redirectUrl(redirectUrl)
+                        .failRedirectUrl(failRedirectUrl)
+                        .consumerId(user.getId().toString())
+                        .recurring(true)
+                        .options(TochkaCreateSubscriptionRequest.SubscriptionOptions.builder()
+                                .period("Month")
+                                .trancheCount(12)
+                                .build())
+                        .build())
+                .build();
+
+        TochkaCreateSubscriptionResponse response = tochkaClient.createSubscription(apiKey, subscriptionRequest);
+
+        var operationId = response.getData().getOperationId();
+        user.setTochkaSubscriptionOperationId(operationId);
+        userRepository.save(user);
 
         var payment = Payment.builder()
                 .paymentSystem(PaymentSystemEnum.TOCHKA)
@@ -72,10 +102,35 @@ public class TochkaPaymentService {
                 .user(user)
                 .plan(plan)
                 .amount(amount)
-                .externalId(response.getData().getOperationId())
+                .externalId(operationId)
                 .build();
         paymentService.save(payment);
+
         return tochkaPaymentMapper.mapToPaymentResponseDto(response);
+    }
+
+    /**
+     * Отписаться от подписки (Set Subscription Status = Cancelled).
+     * Обновляет план пользователя на FREE и очищает tochkaSubscriptionOperationId.
+     *
+     * @param user пользователь
+     */
+    @Transactional
+    public void unsubscribe(User user) {
+        String operationId = user.getTochkaSubscriptionOperationId();
+        if (operationId == null || operationId.isBlank()) {
+            throw new CreatePaymentException("No active subscription to cancel");
+        }
+
+        tochkaClient.setSubscriptionStatus(apiKey, operationId);
+
+        Plan freePlan = planRepository.findByCode(PlanCode.FREE)
+                .orElseThrow(() -> new CreatePaymentException("FREE plan not found"));
+        user.setPlan(freePlan);
+        user.setTochkaSubscriptionOperationId(null);
+        userRepository.save(user);
+
+        log.info("Tochka unsubscribe: user={} subscription {} cancelled", user.getId(), operationId);
     }
 
     /**

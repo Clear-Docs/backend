@@ -39,6 +39,19 @@ public class PaymentController {
         return ResponseEntity.ok(tochkaPaymentService.createPayment(request, user));
     }
 
+    @Operation(summary = "Отписаться от подписки Точка Банк")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Подписка успешно отменена"),
+            @ApiResponse(responseCode = "400", description = "Нет активной подписки для отмены"),
+            @ApiResponse(responseCode = "401", description = "Требуется авторизация"),
+            @ApiResponse(responseCode = "500", description = "Ошибка API Точка Банк")
+    })
+    @PostMapping("/tochka/unsubscribe")
+    public ResponseEntity<Void> unsubscribeTochka(@AuthenticationPrincipal User user) {
+        tochkaPaymentService.unsubscribe(user);
+        return ResponseEntity.ok().build();
+    }
+
     @Operation(summary = "Получить список клиентов Точка Банк (customerCode для настройки)")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Список клиентов с customerCode (нужен с customerType: Business)"),

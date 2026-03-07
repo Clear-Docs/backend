@@ -38,6 +38,9 @@ public class User {
   @Column(name = "persona_id")
   private Integer personaId;
 
+  @Column(name = "tochka_subscription_operation_id")
+  private String tochkaSubscriptionOperationId;
+
   @PrePersist
   public void prePersist() {
     this.createdAt = LocalDateTime.now();
