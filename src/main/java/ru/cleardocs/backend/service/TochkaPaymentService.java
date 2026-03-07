@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.cleardocs.backend.client.tochka.TochkaClient;
+import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
 import ru.cleardocs.backend.constant.PaymentStatus;
 import ru.cleardocs.backend.constant.PaymentSystemEnum;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
@@ -32,12 +33,6 @@ public class TochkaPaymentService {
     @Value("${tochka.api-key:}")
     private String apiKey;
 
-    @Value("${tochka.customer-code:}")
-    private String customerCode;
-
-    @Value("${tochka.merchant-id:}")
-    private String merchantId;
-
     @Value("${tochka.purpose:\"\"}")
     private String purpose;
 
@@ -52,9 +47,17 @@ public class TochkaPaymentService {
      */
     @Transactional
 public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, User user) {
-        var plan = planRepository.findById(request.planId()).orElseThrow(() -> new CreatePaymentException("user plan is empty"));
+        if (request.planId() == null) {
+            throw new CreatePaymentException("planId is required");
+        }
+        var plan = planRepository.findById(request.planId()).orElseThrow(() -> new CreatePaymentException("Plan not found with id: " + request.planId()));
         BigDecimal amount = BigDecimal.valueOf(plan.getPriceRub());
-        var response = tochkaClient.createAcquiringPayment(apiKey, customerCode, amount, purpose, paymentMode, merchantId);
+
+        var customersResponse = tochkaClient.getCustomersList(apiKey);
+        var customerCode = resolveBusinessCustomerCode(customersResponse);
+        log.info("Tochka createPayment: using customerCode={}, planId={}, amount={}", customerCode, request.planId(), amount);
+
+        var response = tochkaClient.createAcquiringPayment(apiKey, customerCode, amount, purpose, paymentMode);
 
         var payment = Payment.builder()
                 .paymentSystem(PaymentSystemEnum.TOCHKA)
@@ -66,5 +69,43 @@ public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, U
                 .build();
         paymentService.save(payment);
         return tochkaPaymentMapper.mapToPaymentResponseDto(response);
+    }
+
+    /**
+     * Извлечь customerCode из ответа Get Customers List.
+     * Берётся из первой записи с customerType: "Business".
+     */
+    private String resolveBusinessCustomerCode(TochkaCustomersListResponse customersResponse) {
+        if (customersResponse == null || customersResponse.getData() == null || customersResponse.getData().isEmpty()) {
+            log.warn("Tochka Get Customers List: empty or null response - check API key and ReadCustomerData permission");
+            throw new CreatePaymentException("Tochka API returned empty customers list");
+        }
+        var customers = customersResponse.getData();
+        log.debug("Tochka Get Customers List: {} client(s) - {}", customers.size(),
+                customers.stream()
+                        .map(c -> String.format("%s(customerType=%s)", c.getCustomerCode(), c.getCustomerType()))
+                        .toList());
+
+        var businessCode = customers.stream()
+                .filter(c -> "Business".equalsIgnoreCase(c.getCustomerType()))
+                .map(TochkaCustomersListResponse.Customer::getCustomerCode)
+                .findFirst();
+
+        if (businessCode.isEmpty()) {
+            var types = customers.stream().map(TochkaCustomersListResponse.Customer::getCustomerType).distinct().toList();
+            log.warn("Tochka Get Customers List: no Business customer found. customerTypes in response: {}", types);
+            throw new CreatePaymentException("No Business customer found in Tochka. Check API permissions (ReadCustomerData)");
+        }
+        var code = businessCode.get();
+        log.info("Tochka Get Customers List: {} client(s), selected customerCode={} (Business)", customers.size(), code);
+        return code;
+    }
+
+    /**
+     * Получить список клиентов Точка Банк (Get Customers List).
+     * Используется для отладки и проверки customerCode.
+     */
+    public TochkaCustomersListResponse getCustomersList() {
+        return tochkaClient.getCustomersList(apiKey);
     }
 }

@@ -9,10 +9,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
 import ru.cleardocs.backend.dto.TochkaPaymentResponseDto;
 import ru.cleardocs.backend.entity.User;
@@ -35,6 +37,17 @@ public class PaymentController {
     @PostMapping("/tochka/createPayment")
     public ResponseEntity<TochkaPaymentResponseDto> createTochkaPayment(@RequestBody TochkaPaymentRequestDto request, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(tochkaPaymentService.createPayment(request, user));
+    }
+
+    @Operation(summary = "Получить список клиентов Точка Банк (customerCode для настройки)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Список клиентов с customerCode (нужен с customerType: Business)"),
+            @ApiResponse(responseCode = "401", description = "Требуется авторизация"),
+            @ApiResponse(responseCode = "500", description = "Ошибка API Точка Банк или tochka.api-key не настроен")
+    })
+    @GetMapping("/tochka/customers")
+    public ResponseEntity<TochkaCustomersListResponse> getTochkaCustomers() {
+        return ResponseEntity.ok(tochkaPaymentService.getCustomersList());
     }
 
 }
