@@ -2,9 +2,9 @@ package ru.cleardocs.backend.client.tochka;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -18,12 +18,6 @@ import java.util.List;
 public class TochkaClient {
 
     private final RestTemplate restTemplate;
-
-    @Value("${tochka.customer-code:}")
-    private String customerCode;
-
-    @Value("${tochka.merchant-id:}")
-    private String merchantId;
 
     /**
      * Метод для создания ссылки на оплату
@@ -56,8 +50,7 @@ public class TochkaClient {
             String customerCode,
             BigDecimal amount,
             String purpose,
-            List<String> paymentMode,
-            String merchantId) {
+            List<String> paymentMode) {
 
         return createAcquiringPayment(apiKey, TochkaClientAcquiringPaymentRequest.builder()
                 .data(TochkaClientAcquiringPaymentRequest.PaymentData.builder()
@@ -65,8 +58,31 @@ public class TochkaClient {
                         .amount(amount.toString())
                         .purpose(purpose)
                         .paymentMode(paymentMode)
-                        .merchantId(merchantId)
                         .build())
                 .build());
+    }
+
+    /**
+     * Получить список клиентов (Get Customers List).
+     * Используется для получения customerCode — нужен для tochka.customer-code.
+     * customerCode берётся из записи с customerType: "Business".
+     *
+     * @param apiKey JWT-токен из «Интеграции и API» в интернет-банке
+     * @return список клиентов с customerCode, customerType и др.
+     */
+    public TochkaCustomersListResponse getCustomersList(String apiKey) {
+        String url = "https://enter.tochka.com/uapi/open-banking/v1.0/customers";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        log.debug("Запрос к АПИ ТочкаБанк Get Customers List: {}", url);
+        try {
+            var response = restTemplate.exchange(url, HttpMethod.GET, entity, TochkaCustomersListResponse.class);
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Ошибка при получении списка клиентов ТочкаБанк: {}", e.getMessage());
+            throw e;
+        }
     }
 }

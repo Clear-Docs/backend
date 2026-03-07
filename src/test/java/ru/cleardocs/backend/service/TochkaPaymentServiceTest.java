@@ -8,6 +8,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.cleardocs.backend.client.tochka.TochkaClient;
 import ru.cleardocs.backend.client.tochka.TochkaClientAcquiringPaymentResponse;
+import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
 import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
@@ -54,8 +55,12 @@ class TochkaPaymentServiceTest {
         data.setPaymentLink(paymentLink);
         mockResponse.setData(data);
 
+        var customer = new TochkaCustomersListResponse.Customer("300000092", "Business", "Test", null);
+        var customersResponse = new TochkaCustomersListResponse(java.util.List.of(customer));
+
         when(planRepository.findById(any())).thenReturn(java.util.Optional.of(user.getPlan()));
-        when(tochkaClient.createAcquiringPayment(any(), any(), any(), any(), any(), any()))
+        when(tochkaClient.getCustomersList(any())).thenReturn(customersResponse);
+        when(tochkaClient.createAcquiringPayment(any(), any(), any(), any(), any()))
                 .thenReturn(mockResponse);
 
         var response = tochkaPaymentService.createPayment(new TochkaPaymentRequestDto(UUID.randomUUID()), user);
