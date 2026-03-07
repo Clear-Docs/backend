@@ -83,11 +83,12 @@ public class TochkaPaymentService {
      * Берётся из первой записи с customerType: "Business".
      */
     private String resolveBusinessCustomerCode(TochkaCustomersListResponse customersResponse) {
-        if (customersResponse == null || customersResponse.getData() == null || customersResponse.getData().isEmpty()) {
+        var data = customersResponse != null ? customersResponse.getData() : null;
+        var customers = data != null ? data.getCustomer() : null;
+        if (customers == null || customers.isEmpty()) {
             log.warn("Tochka Get Customers List: empty or null response - check API key and ReadCustomerData permission");
             throw new CreatePaymentException("Tochka API returned empty customers list");
         }
-        var customers = customersResponse.getData();
         log.debug("Tochka Get Customers List: {} client(s) - {}", customers.size(),
                 customers.stream()
                         .map(c -> String.format("%s(customerType=%s)", c.getCustomerCode(), c.getCustomerType()))

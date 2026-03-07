@@ -54,8 +54,9 @@ class TochkaPaymentServiceTest {
         data.setPaymentLink(paymentLink);
         mockResponse.setData(data);
 
-        var customer = new TochkaCustomersListResponse.Customer("300000092", "Business", "Test", null);
-        var customersResponse = new TochkaCustomersListResponse(java.util.List.of(customer));
+        var customer = new TochkaCustomersListResponse.Customer("300000092", "Business");
+        var customerListData = new TochkaCustomersListResponse.CustomerListData(java.util.List.of(customer));
+        var customersResponse = new TochkaCustomersListResponse(customerListData);
 
         when(planRepository.findByCode(PlanCode.MONTH)).thenReturn(java.util.Optional.of(plan));
         when(tochkaClient.getCustomersList(any())).thenReturn(customersResponse);
