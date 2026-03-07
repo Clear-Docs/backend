@@ -85,7 +85,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
           ONYX_API_KEY: ${{ secrets.ONYX_API_KEY }}
-          TOCHKA_API_KEY: ${{ secrets.TOCHKA_API_KEY }}
+          TOCHKA_API_KEY: ${{ secrets.TOCHKA_JWT }}
           TOCHKA_PURPOSE: ${{ secrets.TOCHKA_PURPOSE }}
         with:
           host: ${{ secrets.SSH_HOST }}
