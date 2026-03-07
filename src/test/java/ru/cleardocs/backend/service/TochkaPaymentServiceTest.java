@@ -48,8 +48,6 @@ class TochkaPaymentServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(tochkaPaymentService, "apiKey", "test-key");
         ReflectionTestUtils.setField(tochkaPaymentService, "purpose", "Test");
-        ReflectionTestUtils.setField(tochkaPaymentService, "redirectUrl", "https://example.com/success");
-        ReflectionTestUtils.setField(tochkaPaymentService, "failRedirectUrl", "https://example.com/fail");
     }
 
     @Test
