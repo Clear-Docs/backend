@@ -43,7 +43,7 @@ public class TochkaClient {
         try {
             return restTemplate.postForObject(url, entity, TochkaClientAcquiringPaymentResponse.class);
         } catch (Exception e) {
-            log.error("Ошибка при создании формы оплаты ТочкаБнак: {}", e.getMessage());
+            log.error("Ошибка при создании формы оплаты ТочкаБанк: {}", e.getMessage());
             throw e;
         }
     }

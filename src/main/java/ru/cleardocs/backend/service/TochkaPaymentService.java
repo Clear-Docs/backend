@@ -52,7 +52,10 @@ public class TochkaPaymentService {
      */
     @Transactional
 public TochkaPaymentResponseDto createPayment(TochkaPaymentRequestDto request, User user) {
-        var plan = planRepository.findById(request.planId()).orElseThrow(() -> new CreatePaymentException("user plan is empty"));
+        if (request.planId() == null) {
+            throw new CreatePaymentException("planId is required");
+        }
+        var plan = planRepository.findById(request.planId()).orElseThrow(() -> new CreatePaymentException("Plan not found with id: " + request.planId()));
         BigDecimal amount = BigDecimal.valueOf(plan.getPriceRub());
         var response = tochkaClient.createAcquiringPayment(apiKey, customerCode, amount, purpose, paymentMode, merchantId);
 
