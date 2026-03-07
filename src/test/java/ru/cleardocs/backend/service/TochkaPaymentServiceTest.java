@@ -1,22 +1,26 @@
 package ru.cleardocs.backend.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import ru.cleardocs.backend.client.tochka.TochkaClient;
-import ru.cleardocs.backend.client.tochka.TochkaClientAcquiringPaymentResponse;
+import ru.cleardocs.backend.client.tochka.TochkaCreateSubscriptionResponse;
 import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
 import ru.cleardocs.backend.constant.PlanCode;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
 import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.mapper.TochkaPaymentMapper;
+import ru.cleardocs.backend.repository.UserRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,11 +35,22 @@ class TochkaPaymentServiceTest {
     @Mock
     ru.cleardocs.backend.repository.PlanRepository planRepository;
 
+    @Mock
+    UserRepository userRepository;
+
     @Spy
     TochkaPaymentMapper tochkaPaymentMapper;
 
     @InjectMocks
     TochkaPaymentService tochkaPaymentService;
+
+    @BeforeEach
+    void setUp() {
+        ReflectionTestUtils.setField(tochkaPaymentService, "apiKey", "test-key");
+        ReflectionTestUtils.setField(tochkaPaymentService, "purpose", "Test");
+        ReflectionTestUtils.setField(tochkaPaymentService, "redirectUrl", "https://example.com/success");
+        ReflectionTestUtils.setField(tochkaPaymentService, "failRedirectUrl", "https://example.com/fail");
+    }
 
     @Test
     void createPayment() {
@@ -48,21 +63,23 @@ class TochkaPaymentServiceTest {
                 .plan(plan)
                 .build();
 
-        TochkaClientAcquiringPaymentResponse mockResponse = new TochkaClientAcquiringPaymentResponse();
-        TochkaClientAcquiringPaymentResponse.PaymentData data = new TochkaClientAcquiringPaymentResponse.PaymentData();
-        data.setOperationId(operationId);
-        data.setPaymentLink(paymentLink);
-        mockResponse.setData(data);
+        var subscriptionData = new TochkaCreateSubscriptionResponse.SubscriptionData();
+        subscriptionData.setOperationId(operationId);
+        subscriptionData.setPaymentLink(paymentLink);
+        var mockResponse = TochkaCreateSubscriptionResponse.builder()
+                .data(subscriptionData)
+                .build();
 
-        var customer = new TochkaCustomersListResponse.Customer("300000092", "Business", "Test", null);
-        var customersResponse = new TochkaCustomersListResponse(java.util.List.of(customer));
+        var customer = new TochkaCustomersListResponse.Customer("300000092", "Business");
+        var customerListData = new TochkaCustomersListResponse.CustomerListData(java.util.List.of(customer));
+        var customersResponse = new TochkaCustomersListResponse(customerListData);
 
         when(planRepository.findByCode(PlanCode.MONTH)).thenReturn(java.util.Optional.of(plan));
         when(tochkaClient.getCustomersList(any())).thenReturn(customersResponse);
-        when(tochkaClient.createAcquiringPayment(any(), any(), any(), any(), any()))
-                .thenReturn(mockResponse);
+        when(tochkaClient.createSubscription(any(), any())).thenReturn(mockResponse);
 
         var response = tochkaPaymentService.createPayment(new TochkaPaymentRequestDto("MONTH"), user);
         assertEquals(paymentLink, response.paymentUrl());
+        verify(userRepository).save(user);
     }
 }

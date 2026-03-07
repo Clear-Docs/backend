@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * Ответ метода Get Customers List (GET /uapi/open-banking/v1.0/customers).
- * Используется для получения customerCode — нужен для создания платёжных ссылок.
+ * Структура по OpenAPI: Data.Customer[] — см. CustomerListResponseModel.
  * customerCode берётся из записи с customerType: "Business".
  */
 @Data
@@ -20,25 +20,25 @@ import java.util.List;
 public class TochkaCustomersListResponse {
 
     @JsonProperty("Data")
-    private List<Customer> data;
+    private CustomerListData data;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CustomerListData {
+        @JsonProperty("Customer")
+        private List<Customer> customer;
+    }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Customer {
-        /**
-         * Уникальный код клиента (9 символов).
-         * Используется как tochka.customer-code при создании платёжных ссылок.
-         */
+        /** Уникальный код клиента (9 символов). Используется для платёжных ссылок. */
         private String customerCode;
-
-        /**
-         * Тип клиента. Для платёжных ссылок нужен "Business".
-         */
+        /** Тип клиента. Для платёжных ссылок нужен "Business". */
         private String customerType;
-
-        private String name;
-        private String inn;
     }
 }
