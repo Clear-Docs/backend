@@ -9,12 +9,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import ru.cleardocs.backend.client.tochka.TochkaClient;
 import ru.cleardocs.backend.client.tochka.TochkaClientAcquiringPaymentResponse;
 import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
+import ru.cleardocs.backend.constant.PlanCode;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
 import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.mapper.TochkaPaymentMapper;
-
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,10 +42,10 @@ class TochkaPaymentServiceTest {
         var paymentLink = "https://merch.example.com/order/?uuid=16ea4c54-bf1d-4e6a-a1ef-53ad55666e43";
         var operationId = "48232c9a-ce82-1593-3cb6-5c85a1ffef8f";
 
-        UUID userId = UUID.fromString("fedac807-078d-45ac-a43b-5c01c57edbf8");
+        var plan = Plan.builder().code(PlanCode.MONTH).priceRub(100).build();
         User user = User.builder()
-                .id(userId)
-                .plan(Plan.builder().priceRub(100).build())
+                .id(java.util.UUID.randomUUID())
+                .plan(plan)
                 .build();
 
         TochkaClientAcquiringPaymentResponse mockResponse = new TochkaClientAcquiringPaymentResponse();
@@ -58,12 +57,12 @@ class TochkaPaymentServiceTest {
         var customer = new TochkaCustomersListResponse.Customer("300000092", "Business", "Test", null);
         var customersResponse = new TochkaCustomersListResponse(java.util.List.of(customer));
 
-        when(planRepository.findById(any())).thenReturn(java.util.Optional.of(user.getPlan()));
+        when(planRepository.findByCode(PlanCode.MONTH)).thenReturn(java.util.Optional.of(plan));
         when(tochkaClient.getCustomersList(any())).thenReturn(customersResponse);
         when(tochkaClient.createAcquiringPayment(any(), any(), any(), any(), any()))
                 .thenReturn(mockResponse);
 
-        var response = tochkaPaymentService.createPayment(new TochkaPaymentRequestDto(UUID.randomUUID()), user);
+        var response = tochkaPaymentService.createPayment(new TochkaPaymentRequestDto("MONTH"), user);
         assertEquals(paymentLink, response.paymentUrl());
     }
 }
