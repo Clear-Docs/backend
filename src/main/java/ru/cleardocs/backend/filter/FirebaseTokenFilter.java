@@ -50,7 +50,7 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
       } catch (FirebaseAuthException e) {
-        log.error("doFilterInternal() - exception with message = {}", e.getMessage());
+        log.error("doFilterInternal() path={} - {}", path, e.getMessage());
       }
     }
     filterChain.doFilter(request, response);

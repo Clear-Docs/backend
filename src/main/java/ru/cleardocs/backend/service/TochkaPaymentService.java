@@ -23,7 +23,6 @@ import ru.cleardocs.backend.repository.PlanRepository;
 import ru.cleardocs.backend.repository.UserRepository;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -41,6 +40,9 @@ public class TochkaPaymentService {
 
     @Value("${tochka.purpose:\"\"}")
     private String purpose;
+
+    @Value("${tochka.subscription.tranche-count:1}")
+    private int subscriptionTrancheCount;
 
     /**
      * Создать подписку через Точка Банк (Create Subscription).
@@ -76,7 +78,7 @@ public class TochkaPaymentService {
                         .consumerId(user.getId().toString())
                         .options(TochkaCreateSubscriptionRequest.SubscriptionOptions.builder()
                                 .period("Month")
-                                .trancheCount(12)
+                                .trancheCount(subscriptionTrancheCount)
                                 .build())
                         .build())
                 .build();

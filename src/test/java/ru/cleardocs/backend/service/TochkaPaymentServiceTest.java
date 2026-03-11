@@ -48,6 +48,7 @@ class TochkaPaymentServiceTest {
     void setUp() {
         ReflectionTestUtils.setField(tochkaPaymentService, "apiKey", "test-key");
         ReflectionTestUtils.setField(tochkaPaymentService, "purpose", "Test");
+        ReflectionTestUtils.setField(tochkaPaymentService, "subscriptionTrancheCount", 1);
     }
 
     @Test
