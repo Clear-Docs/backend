@@ -29,11 +29,14 @@ services:
       ONYX_API_KEY: ${ONYX_API_KEY}
       TOCHKA_API_KEY: ${TOCHKA_API_KEY}
       TOCHKA_PURPOSE: ${TOCHKA_PURPOSE}
+      LOG_PATH: /app/logs
     volumes:
       - ./firebase-key.json:/app/firebase-key.json:ro
+      - backend-logs:/app/logs
     ports:
       - "8080:8080"
     restart: unless-stopped
 
 volumes:
   pgdata:
+  backend-logs:

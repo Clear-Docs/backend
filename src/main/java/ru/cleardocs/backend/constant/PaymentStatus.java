@@ -14,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum PaymentStatus {
     CREATED("CREATED"),
-    PENDING("PENDING");
+    PENDING("PENDING"),
+    /** Оплата прошла (статус APPROVED в вебхуке Точки) */
+    SUCCESS("SUCCESS");
 
     private final String status;
 

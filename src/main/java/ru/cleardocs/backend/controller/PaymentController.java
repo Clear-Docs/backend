@@ -19,6 +19,7 @@ import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
 import ru.cleardocs.backend.dto.TochkaPaymentResponseDto;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.service.TochkaPaymentService;
+import ru.cleardocs.backend.service.TochkaWebhookService;
 
 @Slf4j
 @RestController
@@ -27,6 +28,7 @@ import ru.cleardocs.backend.service.TochkaPaymentService;
 public class PaymentController {
 
     private final TochkaPaymentService tochkaPaymentService;
+    private final TochkaWebhookService tochkaWebhookService;
 
     @Operation(summary = "Инициализация платежа через Точка банк")
     @ApiResponses(value = {
@@ -61,6 +63,21 @@ public class PaymentController {
     @GetMapping("/tochka/customers")
     public ResponseEntity<TochkaCustomersListResponse> getTochkaCustomers() {
         return ResponseEntity.ok(tochkaPaymentService.getCustomersList());
+    }
+
+    /**
+     * Callback от Точка Банк при оплате по платёжной ссылке (вебхук acquiringInternetPayment).
+     * Тело запроса — JWT (Content-Type: text/plain). Не требует авторизации; подпись проверяется ключом Точки.
+     * При status=APPROVED обновляет платёж и тариф пользователя.
+     */
+    @Operation(summary = "Вебхук Точка Банк (оплата прошла)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Вебхук принят (всегда возвращать 200)"),
+    })
+    @PostMapping(value = "/webhook/tochka", consumes = "text/plain")
+    public ResponseEntity<Void> tochkaWebhook(@RequestBody String body) {
+        tochkaWebhookService.handleWebhook(body);
+        return ResponseEntity.ok().build();
     }
 
 }
