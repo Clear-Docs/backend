@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.core5.util.Timeout;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,12 +21,14 @@ public class RestTemplateConfig {
 
   /**
    * RestTemplate for Onyx streaming (send-chat-message). Extended response timeout
-   * (10 min) prevents truncation when LLM pauses during generation.
+   * prevents truncation when LLM/OpenRouter is slow (e.g. >60s). The 60s timeout
+   * in errors is configured in Onyx (litellm), not here.
    */
   @Bean("onyxStreamingRestTemplate")
-  public RestTemplate onyxStreamingRestTemplate() {
+  public RestTemplate onyxStreamingRestTemplate(
+      @Value("${onyx.streaming-timeout-minutes:15}") int streamingTimeoutMinutes) {
     RequestConfig config = RequestConfig.custom()
-        .setResponseTimeout(Timeout.ofMinutes(10))
+        .setResponseTimeout(Timeout.ofMinutes(streamingTimeoutMinutes))
         .build();
     var httpClient = HttpClientBuilder.create()
         .setDefaultRequestConfig(config)

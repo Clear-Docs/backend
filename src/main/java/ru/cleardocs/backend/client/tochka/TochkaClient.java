@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
@@ -37,7 +38,7 @@ public class TochkaClient {
         try {
             return restTemplate.postForObject(url, entity, TochkaClientAcquiringPaymentResponse.class);
         } catch (Exception e) {
-            log.error("Ошибка при создании формы оплаты ТочкаБанк: {}", e.getMessage());
+            logTochkaError("создании формы оплаты", url, e);
             throw e;
         }
     }
@@ -82,7 +83,7 @@ public class TochkaClient {
         try {
             return restTemplate.postForObject(url, entity, TochkaCreateSubscriptionResponse.class);
         } catch (Exception e) {
-            log.error("Ошибка при создании подписки ТочкаБанк: {}", e.getMessage());
+            logTochkaError("создании подписки", url, e);
             throw e;
         }
     }
@@ -109,7 +110,7 @@ public class TochkaClient {
         try {
             return restTemplate.postForObject(url, entity, TochkaSetSubscriptionStatusResponse.class);
         } catch (Exception e) {
-            log.error("Ошибка при отмене подписки ТочкаБанк: {}", e.getMessage());
+            logTochkaError("отмене подписки", url, e);
             throw e;
         }
     }
@@ -133,8 +134,21 @@ public class TochkaClient {
             var response = restTemplate.exchange(url, HttpMethod.GET, entity, TochkaCustomersListResponse.class);
             return response.getBody();
         } catch (Exception e) {
-            log.error("Ошибка при получении списка клиентов ТочкаБанк: {}", e.getMessage());
+            logTochkaError("получении списка клиентов", url, e);
             throw e;
+        }
+    }
+
+    private void logTochkaError(String operation, String url, Exception e) {
+        if (e instanceof RestClientResponseException re) {
+            String body = re.getResponseBodyAsString();
+            String bodySummary = (body != null && (body.stripLeading().startsWith("<!") || body.stripLeading().startsWith("<html")))
+                    ? "[HTML error page, length=" + body.length() + "]"
+                    : body;
+            log.error("Ошибка при {} ТочкаБанк: status={}, responseBody={}, url={}",
+                    operation, re.getStatusCode(), bodySummary, url, e);
+        } else {
+            log.error("Ошибка при {} ТочкаБанк: {}, url={}", operation, e.getMessage(), url, e);
         }
     }
 }
