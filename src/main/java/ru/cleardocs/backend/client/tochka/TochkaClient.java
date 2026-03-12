@@ -116,6 +116,38 @@ public class TochkaClient {
     }
 
     /**
+     * Создать вебхук (Create Webhook).
+     * PUT /webhook/v1.0/{clientId}
+     * Требуется разрешение ManageWebhookData у JWT.
+     *
+     * @param apiKey     JWT-токен
+     * @param clientId   идентификатор клиента (из кабинета или claim iss)
+     * @param webhookUrl полный URL эндпоинта (HTTPS, порт 443)
+     * @param webhookType тип события, например acquiringInternetPayment
+     */
+    public void createWebhook(String apiKey, String clientId, String webhookUrl, String webhookType) {
+        String url = "https://enter.tochka.com/uapi/webhook/v1.0/" + clientId;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        var request = TochkaCreateWebhookRequest.builder()
+                .url(webhookUrl)
+                .webhookType(webhookType)
+                .build();
+        HttpEntity<TochkaCreateWebhookRequest> entity = new HttpEntity<>(request, headers);
+        log.info("Tochka Create Webhook: PUT {} webhookUrl={}, webhookType={}, clientId={}", url, webhookUrl, webhookType, clientId);
+
+        try {
+            restTemplate.exchange(url, HttpMethod.PUT, entity, Void.class);
+            log.info("Tochka Create Webhook: success, webhookUrl={}", webhookUrl);
+        } catch (Exception e) {
+            logTochkaError("создании вебхука", url, e);
+            throw e;
+        }
+    }
+
+    /**
      * Получить список клиентов (Get Customers List).
      * Используется для получения customerCode — нужен для tochka.customer-code.
      * customerCode берётся из записи с customerType: "Business".

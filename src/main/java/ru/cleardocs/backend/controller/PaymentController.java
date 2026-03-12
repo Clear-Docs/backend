@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
 import ru.cleardocs.backend.dto.TochkaPaymentRequestDto;
 import ru.cleardocs.backend.dto.TochkaPaymentResponseDto;
@@ -63,6 +65,27 @@ public class PaymentController {
     @GetMapping("/tochka/customers")
     public ResponseEntity<TochkaCustomersListResponse> getTochkaCustomers() {
         return ResponseEntity.ok(tochkaPaymentService.getCustomersList());
+    }
+
+    @Operation(summary = "Зарегистрировать вебхук в Точке (Create Webhook)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Вебхук успешно зарегистрирован"),
+            @ApiResponse(responseCode = "400", description = "URL вебхука не HTTPS (по умолчанию используется захардкоженный)"),
+            @ApiResponse(responseCode = "401", description = "Требуется авторизация"),
+            @ApiResponse(responseCode = "403", description = "У JWT Точки нет разрешения ManageWebhookData"),
+            @ApiResponse(responseCode = "500", description = "Ошибка API Точка Банк или конфигурации")
+    })
+    @PostMapping("/tochka/register-webhook")
+    public ResponseEntity<Map<String, String>> registerTochkaWebhook() {
+        log.info("POST /tochka/register-webhook: start");
+        try {
+            tochkaPaymentService.registerTochkaWebhook();
+            log.info("POST /tochka/register-webhook: success");
+            return ResponseEntity.ok(Map.of("message", "Webhook registered"));
+        } catch (Exception e) {
+            log.error("POST /tochka/register-webhook failed: {}", e.getMessage());
+            throw e;
+        }
     }
 
     /**

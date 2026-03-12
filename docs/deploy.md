@@ -50,3 +50,16 @@ sudo usermod -aG docker SSH_USER
 ```
 
 3. Первый деплой создаст PostgreSQL в контейнере. Flyway выполнит миграции автоматически при старте backend.
+
+## Вебхук Точка Банк
+
+Эндпоинт приёма колбэков: **POST** `https://<домен-api>/api/v1/pay/webhook/tochka` (тело — JWT, `Content-Type: text/plain`). Чтобы Точка начала слать уведомления об оплатах, вебхук нужно зарегистрировать.
+
+### Регистрация вебхука через API
+
+URL вебхука захардкожен в коде (`TochkaPaymentService.DEFAULT_WEBHOOK_URL`). Если сменится домен API — поменять константу и задеплоить.
+
+1. У JWT Точки (TOCHKA_API_KEY) должно быть разрешение **ManageWebhookData** (выдаётся в кабинете Точки при настройке интеграции).
+2. Вызови один раз (с авторизацией Firebase): **POST** `/api/v1/pay/tochka/register-webhook`. В ответе 200 и `{"message":"Webhook registered"}` — вебхук создан в Точке с событием `acquiringInternetPayment`.
+
+Если вернулось 403 — у токена нет ManageWebhookData. После успешной регистрации повторный вызов может вернуть ошибку от Точки (вебхук уже существует); при необходимости используй Edit/Delete в кабинете или API Точки.
