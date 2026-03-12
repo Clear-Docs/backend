@@ -9,6 +9,7 @@ import ru.cleardocs.backend.client.tochka.TochkaCreateSubscriptionRequest;
 import ru.cleardocs.backend.client.tochka.TochkaCreateSubscriptionResponse;
 import ru.cleardocs.backend.client.tochka.TochkaClient;
 import ru.cleardocs.backend.client.tochka.TochkaCustomersListResponse;
+import ru.cleardocs.backend.dto.TochkaClientIdDto;
 import ru.cleardocs.backend.constant.PlanCode;
 import ru.cleardocs.backend.constant.PaymentStatus;
 import ru.cleardocs.backend.constant.PaymentSystemEnum;
@@ -22,7 +23,10 @@ import ru.cleardocs.backend.mapper.TochkaPaymentMapper;
 import ru.cleardocs.backend.repository.PlanRepository;
 import ru.cleardocs.backend.repository.UserRepository;
 
+import com.nimbusds.jwt.SignedJWT;
+
 import java.math.BigDecimal;
+import java.text.ParseException;
 
 @Slf4j
 @Service
@@ -37,6 +41,12 @@ public class TochkaPaymentService {
 
     @Value("${tochka.api-key:}")
     private String apiKey;
+
+    @Value("${tochka.webhook-url:}")
+    private String webhookUrl;
+
+    @Value("${tochka.client-id:}")
+    private String clientIdFromConfig;
 
     @Value("${tochka.purpose:\"\"}")
     private String purpose;
@@ -163,5 +173,63 @@ public class TochkaPaymentService {
      */
     public TochkaCustomersListResponse getCustomersList() {
         return tochkaClient.getCustomersList(apiKey);
+    }
+
+    /**
+     * Получить client ID для API вебхуков Точки.
+     * Сначала проверяется tochka.client-id; если не задан — извлекается из JWT (claim iss).
+     */
+    public TochkaClientIdDto getTochkaClientId() {
+        if (clientIdFromConfig != null && !clientIdFromConfig.isBlank()) {
+            log.info("Tochka client-id: using tochka.client-id from config, clientId={}", clientIdFromConfig);
+            return new TochkaClientIdDto(clientIdFromConfig.trim());
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("Tochka client-id: api-key and client-id not set");
+            throw new CreatePaymentException("tochka.api-key is not set (and tochka.client-id not set)");
+        }
+        try {
+            SignedJWT jwt = SignedJWT.parse(apiKey.trim());
+            String iss = jwt.getJWTClaimsSet().getIssuer();
+            if (iss == null || iss.isBlank()) {
+                log.warn("Tochka client-id: JWT has no iss claim");
+                throw new CreatePaymentException("JWT has no issuer (iss) claim — set tochka.client-id from cabinet");
+            }
+            log.info("Tochka client-id: using iss from JWT, clientId={}", iss);
+            return new TochkaClientIdDto(iss);
+        } catch (ParseException e) {
+            log.warn("Tochka client-id: failed to parse API key JWT: {}", e.getMessage());
+            throw new CreatePaymentException("Invalid tochka.api-key JWT: " + e.getMessage() + " — or set tochka.client-id from cabinet");
+        }
+    }
+
+    private static final String WEBHOOK_TYPE_ACQUIRING = "acquiringInternetPayment";
+
+    /** URL вебхука для регистрации в Точке. При смене домена — поменять здесь. */
+    private static final String DEFAULT_WEBHOOK_URL = "https://api.cleardocs.ru/api/v1/pay/webhook/tochka";
+
+    /**
+     * Зарегистрировать вебхук в Точке (Create Webhook).
+     * Требуются: tochka.api-key, client id (tochka.client-id или iss из JWT).
+     * URL берётся из tochka.webhook-url или захардкоженный DEFAULT_WEBHOOK_URL.
+     * У JWT должно быть разрешение ManageWebhookData.
+     */
+    public void registerTochkaWebhook() {
+        String url = (webhookUrl != null && !webhookUrl.isBlank()) ? webhookUrl.trim() : DEFAULT_WEBHOOK_URL;
+        boolean fromConfig = (webhookUrl != null && !webhookUrl.isBlank());
+        log.info("Tochka register webhook: url={} (source={})", url, fromConfig ? "tochka.webhook-url" : "default");
+        if (!url.startsWith("https://")) {
+            log.warn("Tochka register webhook: URL is not HTTPS, url={}", url);
+            throw new CreatePaymentException("tochka.webhook-url must be HTTPS");
+        }
+        String clientId = getTochkaClientId().clientId();
+        log.info("Tochka register webhook: calling Create Webhook, clientId={}, webhookType={}", clientId, WEBHOOK_TYPE_ACQUIRING);
+        try {
+            tochkaClient.createWebhook(apiKey, clientId, url, WEBHOOK_TYPE_ACQUIRING);
+            log.info("Tochka webhook registered successfully, url={}", url);
+        } catch (Exception e) {
+            log.error("Tochka register webhook failed: {} — check ManageWebhookData permission, URL reachable from Tочka (HTTPS:443), and response body above", e.getMessage(), e);
+            throw e;
+        }
     }
 }
