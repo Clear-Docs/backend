@@ -11,7 +11,8 @@ import java.util.List;
 
 /**
  * Тело запроса Create Webhook (PUT webhook/v1.0/{client-id}).
- * API Точки требует поле webhooks_list — список вебхуков.
+ * По документации и Rust SDK (docs.rs/tochka_sdk): url — на верхнем уровне,
+ * webhooks_list — массив типов событий (acquiringInternetPayment, incomingPayment и т.д.).
  * Документация: https://developers.tochka.com/docs/tochka-api/api/create-webhook-webhook-v-1-0-client-id-put
  */
 @Data
@@ -22,14 +23,7 @@ import java.util.List;
 public class TochkaCreateWebhookRequest {
 
     @JsonProperty("webhooks_list")
-    private List<WebhookItem> webhooksList;
+    private List<String> webhooksList;
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class WebhookItem {
-        private String url;
-        private String webhookType;
-    }
+    private String url;
 }
