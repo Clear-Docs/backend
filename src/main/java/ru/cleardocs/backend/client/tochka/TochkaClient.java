@@ -6,6 +6,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
@@ -92,12 +93,12 @@ public class TochkaClient {
      * Установить статус подписки (Set Subscription Status).
      * POST /acquiring/v1.0/subscriptions/{operationId}/status
      * Используется для отмены подписки (status=Cancelled).
+     * API может вернуть 200/204 с пустым телом — тогда десериализация не выполняется.
      *
      * @param apiKey      JWT-токен
      * @param operationId идентификатор подписки
-     * @return ответ с результатом операции
      */
-    public TochkaSetSubscriptionStatusResponse setSubscriptionStatus(String apiKey, String operationId) {
+    public void setSubscriptionStatus(String apiKey, String operationId) {
         String url = "https://enter.tochka.com/uapi/acquiring/v1.0/subscriptions/" + operationId + "/status";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -108,7 +109,17 @@ public class TochkaClient {
         log.debug("Запрос к АПИ ТочкаБанк Set Subscription Status: {} operationId={}", url, operationId);
 
         try {
-            return restTemplate.postForObject(url, entity, TochkaSetSubscriptionStatusResponse.class);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    entity,
+                    String.class
+            );
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                log.warn("Tochka Set Subscription Status: unexpected status {} body={}",
+                        response.getStatusCode(), response.getBody());
+            }
+            // Успех: 2xx. Тело может быть пустым — API не всегда возвращает JSON.
         } catch (Exception e) {
             logTochkaError("отмене подписки", url, e);
             throw e;
