@@ -142,9 +142,9 @@ public class TochkaClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
 
-        var item = new TochkaCreateWebhookRequest.WebhookItem(webhookUrl, webhookType);
         var request = TochkaCreateWebhookRequest.builder()
-                .webhooksList(List.of(item))
+                .url(webhookUrl)
+                .webhooksList(List.of(webhookType))
                 .build();
         HttpEntity<TochkaCreateWebhookRequest> entity = new HttpEntity<>(request, headers);
         log.info("Tochka Create Webhook: PUT {} webhookUrl={}, webhookType={}, clientId={}", url, webhookUrl, webhookType, clientId);
