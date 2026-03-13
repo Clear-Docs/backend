@@ -126,7 +126,14 @@ public class TochkaPaymentService {
             throw new CreatePaymentException("No active subscription to cancel");
         }
 
-        tochkaClient.setSubscriptionStatus(apiKey, operationId);
+        log.info("Tochka unsubscribe: calling setSubscriptionStatus, userId={}, operationId={}", user.getId(), operationId);
+        long startMs = System.currentTimeMillis();
+        try {
+            tochkaClient.setSubscriptionStatus(apiKey, operationId);
+        } finally {
+            long elapsedMs = System.currentTimeMillis() - startMs;
+            log.info("Tochka unsubscribe: setSubscriptionStatus returned in {} ms, userId={}, operationId={}", elapsedMs, user.getId(), operationId);
+        }
         user.setTochkaSubscriptionOperationId(null);
         userRepository.save(user);
 
