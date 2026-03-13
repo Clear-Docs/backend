@@ -1,4 +1,4 @@
 package ru.cleardocs.backend.dto;
 
-public record GetMeDto(UserDto user) {
+public record GetMeDto(UserDto user, boolean isCanceled) {
 }

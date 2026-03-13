@@ -42,14 +42,15 @@ class UserControllerTest {
   void getMe_authenticated_returnsUserInfo() throws Exception {
     var userDto = new UserDto("test@example.com", "Test User",
         new PlanDto(PlanCode.FREE, "Бесплатный", 0, 30, new LimitDto(1)), null);
-    when(userService.getMe(any())).thenReturn(new GetMeDto(userDto));
+    when(userService.getMe(any())).thenReturn(new GetMeDto(userDto, true));
 
     mockMvc.perform(get("/api/v1/users/me")
             .with(securityContext(SecurityContextHolder.getContext())))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.user.email").value("test@example.com"))
         .andExpect(jsonPath("$.user.name").value("Test User"))
-        .andExpect(jsonPath("$.user.plan.code").value("FREE"));
+        .andExpect(jsonPath("$.user.plan.code").value("FREE"))
+        .andExpect(jsonPath("$.isCanceled").value(true));
   }
 
   @Test
