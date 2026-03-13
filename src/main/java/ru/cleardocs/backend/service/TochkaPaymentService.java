@@ -228,6 +228,10 @@ public class TochkaPaymentService {
             tochkaClient.createWebhook(apiKey, clientId, url, WEBHOOK_TYPE_ACQUIRING);
             log.info("Tochka webhook registered successfully, url={}", url);
         } catch (Exception e) {
+            if (e.getMessage() != null && e.getMessage().contains("Object already exists")) {
+                log.info("Tochka webhook already registered (Object already exists), url={}", url);
+                return;
+            }
             log.error("Tochka register webhook failed: {} — check ManageWebhookData permission, URL reachable from Tочka (HTTPS:443), and response body above", e.getMessage(), e);
             throw e;
         }
