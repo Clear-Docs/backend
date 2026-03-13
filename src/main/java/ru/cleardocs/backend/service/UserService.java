@@ -36,7 +36,8 @@ public class UserService {
     log.info("getMe() - starts with user id = {}", user.getId());
     // Document set is created lazily when user uploads first file via ConnectorService.createFileConnector()
     // Onyx API does not allow creating document sets with no connectors
-    GetMeDto response = new GetMeDto(userMapper.toDto(user));
+    boolean isCanceled = user.getTochkaSubscriptionOperationId() == null;
+    GetMeDto response = new GetMeDto(userMapper.toDto(user), isCanceled);
     log.info("getMe() - ends");
     return response;
   }
