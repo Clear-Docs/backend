@@ -114,7 +114,8 @@ public class TochkaPaymentService {
 
     /**
      * Отписаться от подписки (Set Subscription Status = Cancelled).
-     * Обновляет план пользователя на FREE и очищает tochkaSubscriptionOperationId.
+     * В Точке подписка отменяется (новых списаний не будет). План на FREE переведёт джоба
+     * PlanExpiryService по истечении оплаченного периода; до этого пользователь остаётся на текущем тарифе.
      *
      * @param user пользователь
      */
@@ -126,14 +127,10 @@ public class TochkaPaymentService {
         }
 
         tochkaClient.setSubscriptionStatus(apiKey, operationId);
-
-        Plan freePlan = planRepository.findByCode(PlanCode.FREE)
-                .orElseThrow(() -> new CreatePaymentException("FREE plan not found"));
-        user.setPlan(freePlan);
         user.setTochkaSubscriptionOperationId(null);
         userRepository.save(user);
 
-        log.info("Tochka unsubscribe: user={} subscription {} cancelled", user.getId(), operationId);
+        log.info("Tochka unsubscribe: user={} subscription {} cancelled, plan unchanged until expiry job", user.getId(), operationId);
     }
 
     /**
