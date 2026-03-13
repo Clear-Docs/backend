@@ -19,6 +19,7 @@ import ru.cleardocs.backend.mapper.TochkaPaymentMapper;
 import ru.cleardocs.backend.repository.UserRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,6 +80,7 @@ class TochkaPaymentServiceTest {
 
         var response = tochkaPaymentService.createPayment(new TochkaPaymentRequestDto("MONTH"), user);
         assertEquals(paymentLink, response.paymentUrl());
+        assertTrue(response.openInNewWindow());
         verify(userRepository).save(user);
     }
 }
