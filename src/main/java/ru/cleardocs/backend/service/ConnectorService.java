@@ -16,6 +16,7 @@ import ru.cleardocs.backend.entity.Limit;
 import ru.cleardocs.backend.entity.Plan;
 import ru.cleardocs.backend.entity.User;
 import ru.cleardocs.backend.exception.BadRequestException;
+import ru.cleardocs.backend.exception.ConnectorNameDuplicateException;
 import ru.cleardocs.backend.exception.NotFoundException;
 import ru.cleardocs.backend.repository.UserRepository;
 import ru.cleardocs.backend.util.DocumentSetNameUtils;
@@ -23,6 +24,7 @@ import ru.cleardocs.backend.util.DocumentSetNameUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -102,14 +104,25 @@ public class ConnectorService {
       throw new BadRequestException("No valid files were uploaded.");
     }
 
-    Set<String> existingNames = onyxClient.getAllConnectorNames();
-    String uniqueName = DocumentSetNameUtils.ensureUniqueName(
-        name, existingNames, user.getId() != null ? user.getId().toString().substring(0, 8) : "user");
+    String suffix = user.getId() != null ? user.getId().toString().substring(0, 8) : "user";
+    Set<String> takenNames = new HashSet<>(onyxClient.getAllConnectorNames());
+    String uniqueName = DocumentSetNameUtils.ensureUniqueName(name, takenNames, suffix);
 
-    OnyxCreateConnectorResponseDto createResponse = onyxClient.createFileConnector(uniqueName, fileLocations, fileNames);
+    OnyxCreateConnectorResponseDto createResponse = null;
+    final int maxRetries = 5;
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        createResponse = onyxClient.createFileConnector(uniqueName, fileLocations, fileNames);
+        break;
+      } catch (ConnectorNameDuplicateException e) {
+        takenNames.add(e.getRejectedName());
+        uniqueName = DocumentSetNameUtils.ensureUniqueName(name, takenNames, suffix);
+        log.info("createFileConnector() - duplicate name, retrying with uniqueName = {}", uniqueName);
+      }
+    }
 
-    if (!Boolean.TRUE.equals(createResponse.success()) || createResponse.data() == null) {
-      throw new RuntimeException("Failed to create connector in Onyx: " + createResponse.message());
+    if (createResponse == null || !Boolean.TRUE.equals(createResponse.success()) || createResponse.data() == null) {
+      throw new RuntimeException("Failed to create connector in Onyx: " + (createResponse != null ? createResponse.message() : "max retries exceeded"));
     }
 
     int ccPairId = createResponse.data();

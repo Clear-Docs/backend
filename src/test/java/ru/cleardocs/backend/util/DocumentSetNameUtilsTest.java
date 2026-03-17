@@ -3,6 +3,7 @@ package ru.cleardocs.backend.util;
 import org.junit.jupiter.api.Test;
 import ru.cleardocs.backend.entity.User;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -178,6 +179,64 @@ class DocumentSetNameUtilsTest {
         List.of("Dup", "Foo"),
         "xyz");
     assertEquals("Dup - xyz", result);
+  }
+
+  @Test
+  void ensureUniqueName_existingNamesContainNull_ignoresNull() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "Only",
+        Arrays.asList("Only", null, "Other"),
+        "abc12");
+    assertEquals("Only - abc12", result);
+  }
+
+  @Test
+  void ensureUniqueName_existingNamesContainBlank_ignoresBlank() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "Name",
+        Arrays.asList("Name", "", "   "),
+        "suf");
+    assertEquals("Name - suf", result);
+  }
+
+  @Test
+  void ensureUniqueName_baseNameWithExtension_addsSuffixWhenTaken() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "file2Salon.txt",
+        Set.of("file2Salon.txt", "other.pdf"),
+        "19e576e3");
+    assertEquals("file2Salon.txt - 19e576e3", result);
+  }
+
+  @Test
+  void ensureUniqueName_suffixAndSuffix2Taken_returnsSuffix3() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "Connector",
+        Set.of("Connector", "Connector - uid12345", "Connector - uid12345-2"),
+        "uid12345");
+    assertEquals("Connector - uid12345-3", result);
+  }
+
+  @Test
+  void ensureUniqueName_manyNumericSuffixesTaken_returnsNextAvailable() {
+    Set<String> taken = Set.of(
+        "Doc",
+        "Doc - x",
+        "Doc - x-2",
+        "Doc - x-3",
+        "Doc - x-4",
+        "Doc - x-5");
+    String result = DocumentSetNameUtils.ensureUniqueName("Doc", taken, "x");
+    assertEquals("Doc - x-6", result);
+  }
+
+  @Test
+  void ensureUniqueName_onlyFirstCandidateTaken_returnsSecond() {
+    String result = DocumentSetNameUtils.ensureUniqueName(
+        "A",
+        Set.of("A", "A - q"),
+        "q");
+    assertEquals("A - q-2", result);
   }
 
   @Test
