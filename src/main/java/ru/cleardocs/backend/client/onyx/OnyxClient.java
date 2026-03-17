@@ -20,8 +20,11 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.client.RequestCallback;
 import org.springframework.web.client.ResponseExtractor;
+import org.springframework.web.client.RestClientResponseException;
 import ru.cleardocs.backend.dto.EntityConnectorDto;
 import ru.cleardocs.backend.exception.BadRequestException;
+import ru.cleardocs.backend.exception.ConnectorNameDuplicateException;
+import ru.cleardocs.backend.exception.DocumentSetSyncingException;
 import ru.cleardocs.backend.exception.NotFoundException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -202,16 +205,21 @@ public class OnyxClient {
     }
 
     HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
-    ResponseEntity<OnyxFileUploadResponseDto> response = restTemplate.exchange(
-        url,
-        HttpMethod.POST,
-        entity,
-        OnyxFileUploadResponseDto.class
-    );
-    if (response.getBody() == null) {
-      throw new IOException("Onyx file upload returned empty response");
+    try {
+      ResponseEntity<OnyxFileUploadResponseDto> response = restTemplate.exchange(
+          url,
+          HttpMethod.POST,
+          entity,
+          OnyxFileUploadResponseDto.class
+      );
+      if (response.getBody() == null) {
+        throw new IOException("Onyx file upload returned empty response");
+      }
+      return response.getBody();
+    } catch (RestClientResponseException e) {
+      log.warn("Onyx file upload failed: status={}, body={}", e.getStatusCode(), e.getResponseBodyAsString());
+      throw new IOException("Onyx file upload failed: " + e.getStatusCode() + " — " + e.getResponseBodyAsString(), e);
     }
-    return response.getBody();
   }
 
   /**
@@ -236,16 +244,26 @@ public class OnyxClient {
         fileNames
     );
     HttpEntity<OnyxConnectorCreateRequestDto> entity = new HttpEntity<>(request, headers);
-    ResponseEntity<OnyxCreateConnectorResponseDto> response = restTemplate.exchange(
-        url,
-        HttpMethod.POST,
-        entity,
-        OnyxCreateConnectorResponseDto.class
-    );
-    if (response.getBody() == null) {
-      throw new RuntimeException("Onyx create connector returned empty response");
+    try {
+      ResponseEntity<OnyxCreateConnectorResponseDto> response = restTemplate.exchange(
+          url,
+          HttpMethod.POST,
+          entity,
+          OnyxCreateConnectorResponseDto.class
+      );
+      if (response.getBody() == null) {
+        throw new RuntimeException("Onyx create connector returned empty response");
+      }
+      return response.getBody();
+    } catch (RestClientResponseException e) {
+      String body = e.getResponseBodyAsString();
+      if (e.getStatusCode().value() == 400 && body != null
+          && (body.contains("already exists") || body.contains("duplicate"))) {
+        log.warn("Onyx create connector rejected (duplicate name): {}", body);
+        throw new ConnectorNameDuplicateException(name);
+      }
+      throw e;
     }
-    return response.getBody();
   }
 
   /**
@@ -419,12 +437,22 @@ public class OnyxClient {
       headers.setBearerAuth(apiKey);
     }
     HttpEntity<OnyxDocumentSetUpdateRequestDto> entity = new HttpEntity<>(request, headers);
-    restTemplate.exchange(
-        url,
-        HttpMethod.PATCH,
-        entity,
-        Void.class
-    );
+    try {
+      restTemplate.exchange(
+          url,
+          HttpMethod.PATCH,
+          entity,
+          Void.class
+      );
+    } catch (RestClientResponseException e) {
+      String body = e.getResponseBodyAsString();
+      if (e.getStatusCode().value() == 400 && body != null && body.contains("syncing")) {
+        log.warn("Onyx document set update rejected (still syncing): {}", body);
+        throw new DocumentSetSyncingException(
+            "Document set is still syncing from a previous upload. Please wait a few minutes and try again.");
+      }
+      throw e;
+    }
   }
 
   /**

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import ru.cleardocs.backend.dto.ErrorDto;
 import ru.cleardocs.backend.exception.BadRequestException;
+import ru.cleardocs.backend.exception.DocumentSetSyncingException;
 import ru.cleardocs.backend.exception.NotFoundException;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,14 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(
         new ErrorDto("File size exceeds maximum allowed. Please upload smaller files.", HttpStatus.PAYLOAD_TOO_LARGE.value(), LocalDateTime.now()),
         HttpStatus.PAYLOAD_TOO_LARGE);
+  }
+
+  @ExceptionHandler(DocumentSetSyncingException.class)
+  public ResponseEntity<ErrorDto> handleDocumentSetSyncing(DocumentSetSyncingException exception) {
+    log.warn("handleDocumentSetSyncing() - {}", exception.getMessage());
+    return new ResponseEntity<>(
+        new ErrorDto(exception.getMessage(), HttpStatus.CONFLICT.value(), LocalDateTime.now()),
+        HttpStatus.CONFLICT);
   }
 
   @ExceptionHandler(NotFoundException.class)
